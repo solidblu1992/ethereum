@@ -409,7 +409,7 @@ contract MLSAG_Algorithms is ECMath {
             c[v.index+1] = v.point1[1];
         }
         
-        //Calculate c1 from c point array = {msgHash, L1x, L1y, R1x, R1y, L2x, L2y, R2x, R2y, ... , Lmx, Lmy, Rmx, Rmy}
+        //Calculate c1 from c point array = {msgHash, P1x, P1y, P2x, P2y, ... , Pmx, Pmy}
         v.ck = Keccak256OfArray(c);
         
         //See if c1 matches the original c1

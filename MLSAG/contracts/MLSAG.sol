@@ -283,30 +283,84 @@ contract MLSAG_Algorithms is ECMath {
         s = addmod(alpha, s, NCurve);
     }
     
+    //Calculate keccak256 of given array
+    function Keccak256OfArray(uint256[] array)
+        internal pure returns (uint256 out)
+    {
+        uint256 len = array.length;
+        uint256[1] memory temp;
+        
+        //Construct c1 (store in c[0])
+    	assembly {
+    	    let p := mload(0x40)
+    	    mstore(p, mul(len, 0x20))
+    	    mstore(temp, keccak256(array, mload(p)))
+    	}
+    	
+    	out = temp[0];
+    }
+    
+    //Struct for reducing stack length
+    struct MLSAGVariables {
+        uint256 m;              //Number of keys (# of rings)
+        uint256 n;              //Number of ring members (per ring)
+        uint256 i;              //for use in "for" loop (i = {0, ..., m})
+        uint256 j;              //for use in "for" loop (j = {0, ..., n})
+        uint256 ck;             //Current hash input for ring segment
+        uint256 index;          //General purpose uint256 for picking index of arrays
+        uint256[2] point1;      //Expanded EC Point for general purpose use
+        uint256[2] point2;      //Expanded EC Point for general purpose use
+        uint256[2] keyImage;    //Expanded EC Point representing key image
+    }
+    
     //Verify MLSAG
-    //ip[] = {m, n, msgHash, I1, I2, ..., Im, c1, s11, s12, ..., s1m, s21, s22, ..., s2m, ..., sn1, sn2, ..., snm}
-    //ip.length = m*(n+1)+2
-    //ip[0] = m = number of ring members
-    function VerifyMLSAG(uint256[] ip)
+    //msgHash = hash of message signed by ring signature
+    //I = {I1, I2, ..., Im}
+    //P = {P11, P12, ..., P1m, P21, P22, ... P2m, Pn1, Pn2, ..., Pnm}
+    //signature = {c1, s11, s12, ..., s1m, s21, s22, ..., s2m, ..., sn1, sn2, ..., snm}
+    function VerifyMLSAG(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
-        //Check input parameter length -> must be m*(n+1)+3
-        if (ip.length < 6) return false;                        //min size: m=1, n=1 => 6; {m, n, msgHash, I1, c1, s11}
-        if ((ip.length - 4) % ip[0] != 0) return false;         //check for whole number of m
-        if ((((ip.length - 4)/ip[0])-1) != ip[1]) return false; //check for matching value of n
+        //Check input array lengths
+        MLSAGVariables memory v;
+        v.m = I.length;
+        if (P.length % v.m != 0) return false;
+        
+        v.n = P.length / v.m;
+        if (signature.length != (v.m*v.n+1)) return false;
         
         //Allocate array for calculating c1
-        uint256[] memory c = new uint256[](4*ip[1]+1);
-        c[0] = ip[2]; //store msgHash
+        uint256[] memory c = new uint256[](4*v.n+1);
+        c[0] = uint256(msgHash);
         
-        uint256 m;
-        uint256 n;
-        uint256 ck;
-        for (m = 0; m < ip[0]; m++) {
-            ck = ip[3+ip[0]]; //fetch c1
-            for (n = 0; n < ip[1]; n++) {
-                ck = CalculateRingSegment(ip[2], ck, ip[4+ip[0]*(n+1)], , ip[])
+        for (v.i = 0; v.i < v.m; v.i++) {
+            v.ck = signature[0];             //extract c1
+            v.keyImage = ExpandPoint(I[v.i]); //extract key image
+            
+            //Calculate (n-1) ring segments
+            for (v.j = 0; v.j < (v.n-1); v.j++) {
+                v.index = v.m*v.i + v.j;
+                v.point1 = ExpandPoint(P[v.index]);
+                v.ck = CalculateRingSegment(msgHash, v.ck, signature[v.index+1], v.point1, v.keyImage);
             }
+            
+            //Calculate last ring segment
+            v.index = v.m*v.i + (v.n-1);
+            v.point1 = ExpandPoint(P[v.index]);
+            (v.point1, v.point2) = CalculateRingSegment_NoHash(v.ck, signature[v.index+1], v.point1, v.keyImage);
+            
+            //Store input to c1 calculation
+            v.index = v.i*2+1;
+            c[v.index] = v.point1[0];
+            c[v.index+1] = v.point1[1];
+            c[v.index+2] = v.point2[0];
+            c[v.index+3] = v.point2[1];
         }
+        
+        //Calculate c1 from c point array = {msgHash, L1x, L1y, R1x, R1y, L2x, L2y, R2x, R2y, ... , Lmx, Lmy, Rmx, Rmy}
+        v.ck = Keccak256OfArray(c);
+        
+        //See if c1 matches the original c1
+        success = (v.ck == signature[0]);
     }
 }

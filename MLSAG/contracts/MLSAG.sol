@@ -313,7 +313,31 @@ contract MLSAG_Algorithms is ECMath {
         uint256[2] keyImage;    //Expanded EC Point representing key image
     }
     
-    //Verify MLSAG
+    //Verify LSAG (Linkable Spontaneous Ad-hoc Group Signature)
+    //msgHash = hash of message signed by ring signature
+    //I = {I1, I2, ..., Im}
+    //P = {P1, P2, ..., Pn}
+    //signature = {c1, s1, s2, ... , sn}
+    function VerifyLSAG(bytes32 msgHash, uint256 I, uint256[] P, uint256[] signature)
+        public constant returns (bool success)
+    {
+        //Check input array lengths
+        MLSAGVariables memory v;
+        v.n = P.length;
+        if (signature.length != (v.n+1)) return false;
+        
+        v.ck = signature[0];            //extract c1
+        v.keyImage = ExpandPoint(I);    //extract key image
+        for (v.i = 0; v.i < v.n; v.i++) {
+            v.point1 = ExpandPoint(P[v.i]); //extract public key
+            v.ck = CalculateRingSegment(msgHash, v.ck, signature[v.i+1], v.point1, v.keyImage);
+        }
+        
+        //See if c1 matches the original c1
+        success = (v.ck == signature[0]);
+    }
+    
+    //Verify MLSAG (Multilayered Linkable Spontaneous Ad-hoc Group Signature)
     //msgHash = hash of message signed by ring signature
     //I = {I1, I2, ..., Im}
     //P = {P11, P12, ..., P1m, P21, P22, ... P2m, Pn1, Pn2, ..., Pnm}
@@ -334,17 +358,17 @@ contract MLSAG_Algorithms is ECMath {
         c[0] = uint256(msgHash);
         
         for (v.i = 0; v.i < v.m; v.i++) {
-            v.ck = signature[0];             //extract c1
-            v.keyImage = ExpandPoint(I[v.i]); //extract key image
+            v.ck = signature[0];                //extract c1
+            v.keyImage = ExpandPoint(I[v.i]);   //extract key image
             
-            //Calculate (n-1) ring segments
+            //Calculate (n-1) ring segments (output scalar ck)
             for (v.j = 0; v.j < (v.n-1); v.j++) {
                 v.index = v.m*v.i + v.j;
-                v.point1 = ExpandPoint(P[v.index]);
+                v.point1 = ExpandPoint(P[v.index]); //extract public key
                 v.ck = CalculateRingSegment(msgHash, v.ck, signature[v.index+1], v.point1, v.keyImage);
             }
             
-            //Calculate last ring segment
+            //Calculate last ring segment (output EC point input for c1 calculation)
             v.index = v.m*v.i + (v.n-1);
             v.point1 = ExpandPoint(P[v.index]);
             (v.point1, v.point2) = CalculateRingSegment_NoHash(v.ck, signature[v.index+1], v.point1, v.keyImage);

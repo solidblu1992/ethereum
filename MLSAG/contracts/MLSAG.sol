@@ -393,7 +393,7 @@ contract MLSAG_Algorithms is ECMath {
         if (signature.length != (v.m*v.n+1)) return false;
         
         //Allocate array for calculating c1
-        uint256[] memory c = new uint256[](2*v.n+1);
+        uint256[] memory c = new uint256[](2*v.m+1);
         c[0] = uint256(msgHash);
         
         for (v.i = 0; v.i < v.m; v.i++) {
@@ -465,7 +465,7 @@ contract MLSAG_Algorithms is ECMath {
         if (signature.length != (v.m*v.n+1)) return false;
         
         //Allocate array for calculating c1
-        uint256[] memory c = new uint256[](4*v.n+1);
+        uint256[] memory c = new uint256[](4*v.m+1);
         c[0] = uint256(msgHash);
         
         for (v.i = 0; v.i < v.m; v.i++) {

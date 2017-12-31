@@ -485,7 +485,7 @@ contract MLSAG_Algorithms is ECMath {
             (v.point1, v.point2) = CalculateLinkableRingSegment_NoHash(v.ck, signature[v.index+1], v.point1, v.keyImage);
             
             //Store input to c1 calculation
-            v.index = v.i*2+1;
+            v.index = v.i*4+1;
             c[v.index] = v.point1[0];
             c[v.index+1] = v.point1[1];
             c[v.index+2] = v.point2[0];

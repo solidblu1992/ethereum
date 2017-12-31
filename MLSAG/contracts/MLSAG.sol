@@ -228,13 +228,16 @@ contract MLSAG_Algorithms is ECMath {
         return uint256(keccak256(msgHash, point[0], point[1])) % NCurve;
     }
     
+    function StartRing_NoHash(uint256 alpha)
+        internal constant returns (uint256[2] Pout)
+    {
+        Pout = ecMul(G1, alpha);
+    }
+    
     function StartRing(bytes32 msgHash, uint256 alpha)
         internal constant returns (uint256 ckp)
     {
-        uint256[2] memory temp;
-        temp = ecMul(G1, alpha);
-        
-        ckp = RingHashFunction(msgHash, temp);
+        ckp = RingHashFunction(msgHash, StartRing_NoHash(alpha));
     }
     
     function CalculateRingSegment_NoHash(uint256 ck, uint256 sk, uint256[2] P)
@@ -281,16 +284,21 @@ contract MLSAG_Algorithms is ECMath {
         I = temp;
     }
     
+    function StartLinkableRing_NoHash(uint256 alpha, uint256[2] P)
+        internal constant returns (uint256[2] Lout, uint256[2] Rout)
+    {
+        Lout = ecMul(G1, alpha);
+        
+        Rout = HashToPoint(P);
+        Rout = ecMul(Rout, alpha);
+    }
+    
     function StartLinkableRing(bytes32 msgHash, uint256 alpha, uint256[2] P)
         internal constant returns (uint256 ckp)
     {
         uint256[2] memory left;
         uint256[2] memory right;
-        left = ecMul(G1, alpha);
-        
-        right = HashToPoint(P);
-        right = ecMul(right, alpha);
-        
+        (left, right) = StartLinkableRing_NoHash(alpha, P);
         ckp = LinkableRingHashFunction(msgHash, left, right);
     }
     
@@ -393,13 +401,13 @@ contract MLSAG_Algorithms is ECMath {
             
             //Calculate (n-1) ring segments (output scalar ck)
             for (v.j = 0; v.j < (v.n-1); v.j++) {
-                v.index = v.m*v.i + v.j;
+                v.index = v.m*v.j + v.i;
                 v.point1 = ExpandPoint(P[v.index]); //extract public key
                 v.ck = CalculateRingSegment(msgHash, v.ck, signature[v.index+1], v.point1);
             }
             
             //Calculate last ring segment (output EC point input for c1 calculation)
-            v.index = v.m*v.i + (v.n-1);
+            v.index = v.m*(v.n-1) + v.i;
             v.point1 = ExpandPoint(P[v.index]);
             v.point1 = CalculateRingSegment_NoHash(v.ck, signature[v.index+1], v.point1);
             
@@ -409,7 +417,7 @@ contract MLSAG_Algorithms is ECMath {
             c[v.index+1] = v.point1[1];
         }
         
-        //Calculate c1 from c point array = {msgHash, P1x, P1y, P2x, P2y, ... , Pmx, Pmy}
+        //Calculate c1 from c point array = {msgHash, P1x, P1y, P2x, P2y, , ... , Pmx, Pmy}
         v.ck = Keccak256OfArray(c);
         
         //See if c1 matches the original c1
@@ -466,13 +474,13 @@ contract MLSAG_Algorithms is ECMath {
             
             //Calculate (n-1) ring segments (output scalar ck)
             for (v.j = 0; v.j < (v.n-1); v.j++) {
-                v.index = v.m*v.i + v.j;
+                v.index = v.m*v.j + v.i;
                 v.point1 = ExpandPoint(P[v.index]); //extract public key
                 v.ck = CalculateLinkableRingSegment(msgHash, v.ck, signature[v.index+1], v.point1, v.keyImage);
             }
             
             //Calculate last ring segment (output EC point input for c1 calculation)
-            v.index = v.m*v.i + (v.n-1);
+            v.index = v.m*(v.n-1) + v.i;
             v.point1 = ExpandPoint(P[v.index]);
             (v.point1, v.point2) = CalculateLinkableRingSegment_NoHash(v.ck, signature[v.index+1], v.point1, v.keyImage);
             

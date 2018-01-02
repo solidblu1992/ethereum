@@ -215,12 +215,14 @@ def msag_test(N=3, M=4):
     print("[", end="")
     for i in range(0, M):
         xk = PrivKeys[key]
-        key = key+2
+        key = key+1
         print("\"" + xk, end="")
         if (i != (M-1)):
             print("\",")
         else:
             print("\"],")
+
+    key = key*2
 
     print("[", end="")
     for i in range(0, M):

@@ -1,4 +1,4 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.17;
 
 import "./MLSAG_Algorithms.sol";
 
@@ -11,21 +11,22 @@ contract MLSAG_Sign is MLSAG_Algorithms {
     //msgHash = hash of message signed by ring signature
     //xk = known private key
     //i = index at which to put the known key
-    //P = {P1, P2, ..., P(n-1)}
+    //P = {P1x, P1y, P2x, P2y, ..., P(n-1)x, P(n-1)y}
     //random = random numbers, need one for each public key (including the known one)
     function SignSAG(bytes32 msgHash, uint256 xk, uint256 i, uint256[] Pin, uint256[] random)
-        public constant returns (uint256[] Pout, uint256[] signature)
+        public view returns (uint256[] Pout, uint256[] signature)
     {
         //Check input array lengths
         MLSAGVariables memory v;
-        v.n = (Pin.length+1);
-        if (random.length != v.n) return;
+        if (Pin.length % 2 != 0) revert();
+        v.n = ((Pin.length/2)+1);
+        if (random.length != v.n) revert();
         
         //Make sure index is mod n
         i = i % v.n;
         
         //Initalize arrays
-        Pout = new uint256[](v.n);
+        Pout = new uint256[](2*v.n);
         signature = new uint256[](v.n+1);
         
         //Start ring
@@ -39,12 +40,12 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             }
             
             if (v.i > i) {
-                v.point1 = ExpandPoint(Pin[v.i-1]); //extract public key
-                Pout[v.i] = Pin[v.i-1]; //for usability only
+                v.point1 = [Pin[2*v.i-2], Pin[2*v.i-1]];
+                (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             }
             else {
-                v.point1 = ExpandPoint(Pin[v.i]); //extract public key
-                Pout[v.i] = Pin[v.i]; //for usability only
+                v.point1 = [Pin[2*v.i], Pin[2*v.i+1]];
+                (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             }
             
             v.ck = CalculateRingSegment(msgHash, v.ck, random[v.i], v.point1);
@@ -60,8 +61,33 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         
         //Close Ring
         signature[i+1] = CompleteRing(random[i], v.ck, xk);
+        v.point1 = ecMul(G1, xk); //for usability only
+        (Pout[2*i], Pout[2*i+1]) = (v.point1[0], v.point1[1]);
+    }
+    
+    function SignSAG_Compressed(bytes32 msgHash, uint256 xk, uint256 i, uint256[] Pin, uint256[] random)
+        public constant returns (uint256[] Pout, uint256[] signature)
+    {
+        //Expand Input Public Keys
+        uint256[] memory Pin_Uncomp = new uint256[](Pin.length*2);
+        uint256[2] memory temp;
         
-        Pout[i] = CompressPoint(ecMul(G1, xk)); //for usability only
+        uint256 j;
+        for (j = 0; j < Pin.length; j++) {
+            temp = ExpandPoint(Pin[j]);
+            (Pin_Uncomp[2*j], Pin_Uncomp[2*j+1]) = (temp[0], temp[1]);
+        }
+        
+        uint256[] memory Pout_Uncomp;
+        
+        //Compress Output Public Keys
+        (Pout_Uncomp, signature) = SignSAG(msgHash, xk, i, Pin_Uncomp, random);
+        Pout = new uint256[](Pout_Uncomp.length / 2);
+        
+        for (j = 0; j < Pout.length; j++) {
+            (temp[0], temp[1]) = (Pout_Uncomp[2*j], Pout_Uncomp[2*j+1]);
+            Pout[j] = CompressPoint(temp);
+        }
     }
     
     //Sign LSAG (Linkable Spontaneous Ad-hoc Group Signature)
@@ -69,31 +95,33 @@ contract MLSAG_Sign is MLSAG_Algorithms {
     //msgHash = hash of message signed by ring signature
     //xk = known private keys {x1, x2, ..., xm}
     //i = index at which to put the known keys {i1, i2, ..., im}
-    //P = {P1, P2, ..., P(n-1)}
+    //P = {P1x, P1y, P2x, P2y, ..., P(n-1)x, P(n-1)y}
     //random = random numbers, need one for each public key (including the known one)
     function SignLSAG(bytes32 msgHash, uint256 xk, uint256 i, uint256[] Pin, uint256[] random)
-        public constant returns (uint256 I, uint256[] Pout, uint256[] signature)
+        public constant returns (uint256[] I, uint256[] Pout, uint256[] signature)
     {
         //Check input array lengths
         MLSAGVariables memory v;
-        v.n = (Pin.length+1);
-        if (random.length != v.n) return;
+        if (Pin.length % 2 != 0) revert();
+        v.n = ((Pin.length/2)+1);
+        if (random.length != v.n) revert();
         
         //Make sure index is mod n
         i = i % v.n;
         
         //Initalize arrays
-        Pout = new uint256[](v.n);
+        Pout = new uint256[](2*v.n);
         signature = new uint256[](v.n+1);
+        I = new uint256[](2);
         
         //Generate key Image
         v.keyImage = CalculateKeyImageFromPrivKey(xk);
-        I = CompressPoint(v.keyImage);
+        (I[0], I[1]) = (v.keyImage[0], v.keyImage[1]);
         
         //Start ring
         v.point2 = ecMul(G1, xk);
         v.ck = StartLinkableRing(msgHash, random[i], v.point2);
-        Pout[i] = CompressPoint(v.point2); //for usability only
+        (Pout[2*i], Pout[2*i+1]) = (v.point2[0], v.point2[1]); //for usability only
         
         //Move around ring
         for (v.i = ((i+1) % v.n); v.i != i; v.i = (v.i+1) % v.n) {
@@ -103,12 +131,12 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             }
             
             if (v.i > i) {
-                v.point1 = ExpandPoint(Pin[v.i-1]); //extract public key
-                Pout[v.i] = Pin[v.i-1]; //for usability only
+                v.point1 = [Pin[2*v.i-2], Pin[2*v.i-1]];
+                (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             }
             else {
-                v.point1 = ExpandPoint(Pin[v.i]); //extract public key
-                Pout[v.i] = Pin[v.i]; //for usability only
+                v.point1 = [Pin[2*v.i], Pin[2*v.i+1]];
+                (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             }
             
             v.ck = CalculateLinkableRingSegment(msgHash, v.ck, random[v.i], v.point1, v.keyImage);
@@ -126,6 +154,35 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         signature[i+1] = CompleteRing(random[i], v.ck, xk);
     }
 
+    function SignLSAG_Compressed(bytes32 msgHash, uint256 xk, uint256 i, uint256[] Pin, uint256[] random)
+        public constant returns (uint256 I, uint256[] Pout, uint256[] signature)
+    {
+        //Expand Input Public Keys
+        uint256[] memory Pin_Uncomp = new uint256[](Pin.length*2);
+        uint256[2] memory temp;
+        
+        uint256 j;
+        for (j = 0; j < Pin.length; j++) {
+            temp = ExpandPoint(Pin[j]);
+            (Pin_Uncomp[2*j], Pin_Uncomp[2*j+1]) = (temp[0], temp[1]);
+        }
+        
+        uint256[] memory Pout_Uncomp;
+        uint256[] memory I_Uncomp;
+        
+        //Compress Output Public Keys
+        (I_Uncomp, Pout_Uncomp, signature) = SignLSAG(msgHash, xk, i, Pin_Uncomp, random);
+        Pout = new uint256[](Pout_Uncomp.length / 2);
+        
+        for (j = 0; j < Pout.length; j++) {
+            (temp[0], temp[1]) = (Pout_Uncomp[2*j], Pout_Uncomp[2*j+1]);
+            Pout[j] = CompressPoint(temp);
+        }
+        
+        (temp[0], temp[1]) = (I_Uncomp[0], I_Uncomp[1]);
+        I = CompressPoint(temp);
+    }
+
     //Sign MSAG (Multilayered Spontaneous Ad-hoc Group Signature, non-linkable)
     //m = number of keys in vector (# of inputs to be signed)
     //msgHash = hash of message signed by ring signature
@@ -139,11 +196,11 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         //Check input array lengths
         MLSAGVariables memory v;
         v.m = m;
-        if(xk.length != v.m) return;
-        if(i.length != v.m) return;
-        if (Pin.length % v.m != 0) return;
+        if(xk.length != v.m) revert();
+        if(i.length != v.m) revert();
+        if (Pin.length % v.m != 0) revert();
         v.n = (Pin.length / v.m)+1;
-        if (random.length != (v.m*v.n)) return;
+        if (random.length != (v.m*v.n)) revert();
         
         //Initalize arrays
         Pout = new uint256[](v.m*v.n);
@@ -245,11 +302,11 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         //Check input array lengths
         MLSAGVariables memory v;
         v.m = m;
-        if(xk.length != v.m) return;
-        if(i.length != v.m) return;
-        if (Pin.length % v.m != 0) return;
+        if(xk.length != v.m) revert();
+        if(i.length != v.m) revert();
+        if (Pin.length % v.m != 0) revert();
         v.n = (Pin.length / v.m)+1;
-        if (random.length != (v.m*v.n)) return;
+        if (random.length != (v.m*v.n)) revert();
         
         //Initalize arrays
         I = new uint256[](v.m);

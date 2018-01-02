@@ -3,7 +3,7 @@ pragma solidity ^0.4.19;
 import "./MLSAG_Verify.sol";
 
 contract MLSAG_Verify_GasTests is MLSAG_Verify {
-    function MLSAG_Verification_GasTests() public {
+    function MLSAG_Verify_GasTests() public {
         //Constructor Code
     }
     

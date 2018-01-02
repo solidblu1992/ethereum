@@ -7,19 +7,6 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         //Constructor
     }
     
-    //Struct for reducing stack length
-    struct MLSAGVariables {
-        uint256 m;              //Number of keys (# of rings)
-        uint256 n;              //Number of ring members (per ring)
-        uint256 i;              //for use in "for" loop (i = {0, ..., m})
-        uint256 j;              //for use in "for" loop (j = {0, ..., n})
-        uint256 ck;             //Current hash input for ring segment
-        uint256 index;          //General purpose uint256 for picking index of arrays
-        uint256[2] point1;      //Expanded EC Point for general purpose use
-        uint256[2] point2;      //Expanded EC Point for general purpose use
-        uint256[2] keyImage;    //Expanded EC Point representing key image
-    }
-    
     //Sign SAG (Spontaneous Ad-hoc Group Signature, non-linkable)
     //msgHash = hash of message signed by ring signature
     //xk = known private key

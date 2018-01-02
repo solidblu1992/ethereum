@@ -2,8 +2,8 @@ pragma solidity ^0.4.19;
 
 import "./ECMath.sol";
 
-contract MLSAG_SigningAlgorithms is ECMath {
-    function MLSAG_Test() public {
+contract MLSAG_Sign is ECMath {
+    function MLSAG_Sign() public {
         //Constructor
     }
     

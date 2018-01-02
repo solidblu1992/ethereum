@@ -131,14 +131,14 @@ contract MLSAG_Verify is MLSAG_Algorithms {
             
             //Calculate (n-1) ring segments (output scalar ck)
             for (v.j = 0; v.j < (v.n-1); v.j++) {
-                v.index = 2*v.m*v.j + v.i;
-                (v.point1[0], v.point1[1]) = (P[v.index], P[v.index+1]); //extract public key
+                v.index = v.m*v.j + v.i;
+                (v.point1[0], v.point1[1]) = (P[2*v.index], P[2*v.index+1]); //extract public key
                 v.ck = CalculateRingSegment(msgHash, v.ck, signature[v.index+1], v.point1);
             }
             
             //Calculate last ring segment (output EC point input for c1 calculation)
-            v.index = 2*v.m*(v.n-1) + v.i;
-            (v.point1[0], v.point1[1]) = (P[v.index], P[v.index+1]); 
+            v.index = v.m*(v.n-1) + v.i;
+            (v.point1[0], v.point1[1]) = (P[2*v.index], P[2*v.index+1]); 
             v.point1 = CalculateRingSegment_NoHash(v.ck, signature[v.index+1], v.point1);
             
             //Store input to c1 calculation
@@ -193,7 +193,8 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     {
         //Check input array lengths
         MLSAGVariables memory v;
-        v.m = I.length;
+        if(I.length % 2 != 0) return false;
+        v.m = (I.length / 2);
         if (P.length % (2*v.m) != 0) return false;
         
         v.n = P.length / (2*v.m);
@@ -205,18 +206,18 @@ contract MLSAG_Verify is MLSAG_Algorithms {
         
         for (v.i = 0; v.i < v.m; v.i++) {
             v.ck = signature[0];                //extract c1
-            v.keyImage = ExpandPoint(I[v.i]);   //extract key image
+            v.keyImage = [I[2*v.i], I[2*v.i+1]]; //extract key image
             
             //Calculate (n-1) ring segments (output scalar ck)
             for (v.j = 0; v.j < (v.n-1); v.j++) {
-                v.index = 2*v.m*v.j + v.i;
-                (v.point1[0], v.point1[1]) = (P[v.index], P[v.index+1]); //extract public key
+                v.index = v.m*v.j + v.i;
+                v.point1 = [P[2*v.index], P[2*v.index+1]]; //extract public key
                 v.ck = CalculateLinkableRingSegment(msgHash, v.ck, signature[v.index+1], v.point1, v.keyImage);
             }
             
             //Calculate last ring segment (output EC point input for c1 calculation)
-            v.index = 2*v.m*(v.n-1) + v.i;
-            (v.point1[0], v.point1[1]) = (P[v.index], P[v.index+1]);
+            v.index = v.m*(v.n-1) + v.i;
+            v.point1 = [P[2*v.index], P[2*v.index+1]]; //extract public key
             (v.point1, v.point2) = CalculateLinkableRingSegment_NoHash(v.ck, signature[v.index+1], v.point1, v.keyImage);
             
             //Store input to c1 calculation

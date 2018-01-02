@@ -415,7 +415,7 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             v.ck = signature[0];    
             
             //Re-extract key image
-            v.keyImage = ExpandPoint(I[v.i]);
+            v.keyImage = [I[2*v.i], I[2*v.i+1]];
             
             //Calculate remaining ring segments (output scalar ck)
             for (v.j = 0; v.j < i[v.i]; v.j++) {

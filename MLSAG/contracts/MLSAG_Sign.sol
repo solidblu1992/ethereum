@@ -434,4 +434,36 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             signature[v.index+1] = CompleteRing(random[v.index], v.ck, xk[v.i]);
         }
     }
+    
+    function SignMLSAG_Compressed(uint256 m, bytes32 msgHash, uint256[] xk, uint256[] i, uint256[] Pin, uint256[] random)
+        public constant returns (uint256[] I, uint256[] Pout, uint256[] signature)
+    {
+        //Expand Input Public Keys
+        uint256[] memory Pin_Uncomp = new uint256[](Pin.length*2);
+        uint256[2] memory temp;
+        
+        uint256 j;
+        for (j = 0; j < Pin.length; j++) {
+            temp = ExpandPoint(Pin[j]);
+            (Pin_Uncomp[2*j], Pin_Uncomp[2*j+1]) = (temp[0], temp[1]);
+        }
+        
+        uint256[] memory Pout_Uncomp;
+        uint256[] memory I_Uncomp;
+        
+        //Compress Output Public Keys
+        (I_Uncomp, Pout_Uncomp, signature) = SignMLSAG(m, msgHash, xk, i, Pin_Uncomp, random);
+        Pout = new uint256[](Pout_Uncomp.length / 2);
+        I = new uint256[](I_Uncomp.length / 2);
+        
+        for (j = 0; j < Pout.length; j++) {
+            (temp[0], temp[1]) = (Pout_Uncomp[2*j], Pout_Uncomp[2*j+1]);
+            Pout[j] = CompressPoint(temp);
+        }
+        
+        for (j = 0; j < I.length; j++) {
+            (temp[0], temp[1]) = (I_Uncomp[2*j], I_Uncomp[2*j+1]);
+            I[j] = CompressPoint(temp);
+        }
+    }
 }

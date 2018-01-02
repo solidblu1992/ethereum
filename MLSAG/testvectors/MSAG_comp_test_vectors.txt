@@ -1,7 +1,7 @@
 /*******************************************************************
- *	MSAG Test Vectors											                         *
+ *     MSAG Compressed Test Vectors                                *
  *******************************************************************/
-//Sign MSAG
+//Sign MSAG Compressed
 "3",
 "0x2cd60b2fe1f22f254254ebbc6988a2e359ebb8987c8b430b7bf1a25056d9096a",
 ["0x73c07c62b6cb96a3498aaa2ddc2436c8e63a86a53988731c6e302b811a919e7",
@@ -78,7 +78,7 @@
 "0x24264759c7cd286801c82e40a87fb8c02e803fbdd4819c9fe08069112f2bf1c8",
 "0x2385f678363c89a5f800ff604fa8cbd2dd409becf5e7c6e3753e15ae5829bf1b"]
 
-//Verify MSAG
+//Verify MSAG Compressed
 "3",
 "0x2cd60b2fe1f22f254254ebbc6988a2e359ebb8987c8b430b7bf1a25056d9096a",
 ["0xa193a5a2223974dddbdae7e5be82ac8c5cedb51c749d7746c6914044a62512e2",

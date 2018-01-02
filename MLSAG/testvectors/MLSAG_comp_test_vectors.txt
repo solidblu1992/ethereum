@@ -1,7 +1,7 @@
 /*******************************************************************
- *  MSLAG Test Vectors                                             *
+ *     MSLAG Compressed Test Vectors                               *
  *******************************************************************/
-//Sign MLSAG
+//Sign MLSAG Compressed
 "3",
 "0x2cd60b2fe1f22f254254ebbc6988a2e359ebb8987c8b430b7bf1a25056d9096a",
 ["0x73c07c62b6cb96a3498aaa2ddc2436c8e63a86a53988731c6e302b811a919e7",
@@ -78,7 +78,7 @@
 "0x24264759c7cd286801c82e40a87fb8c02e803fbdd4819c9fe08069112f2bf1c8",
 "0x2385f678363c89a5f800ff604fa8cbd2dd409becf5e7c6e3753e15ae5829bf1b"]
 
-//Verify MLSAG
+//Verify MLSAG Compressed
 "0x2cd60b2fe1f22f254254ebbc6988a2e359ebb8987c8b430b7bf1a25056d9096a",
 ["0x889664251c42e9be2bd7300b033a55d3a06760c113f0af20c0a9189a1b086b5c",
 "0x641a8963b11a0ac9d50b0ce4ecdb278a32fc36938372c38e97e21171965d2c2",

@@ -2,7 +2,7 @@ pragma solidity ^0.4.19;
 
 import "./ECMath.sol";
 
-contract MLSAG_Verification is ECMath {
+contract MLSAG_Verify is ECMath {
     function MLSAG_Verification() public {
         //Constructor
     }

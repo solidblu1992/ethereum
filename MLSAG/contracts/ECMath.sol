@@ -153,19 +153,6 @@ contract ECMath is Debuggable {
     	}
 	}
 	
-	//Public Functions
-	function ECMulG1(uint256 s)
-	    public constant returns(uint256 P)
-	{
-	    P = CompressPoint(ecMul(G1, s));
-	}
-	
-	function ECMulH(uint256 s)
-	    public constant returns(uint256 P)
-	{
-	    P = CompressPoint(ecMul(H, s));
-	}
-	
 	//Address Functions
 	function GetAddress(uint256[2] PubKey)
         public pure returns (address addr)
@@ -173,12 +160,16 @@ contract ECMath is Debuggable {
         addr = address( keccak256(PubKey[0], PubKey[1]) );
     }
     
+    function GetPublicKeyFromPrivateKey(uint256 privatekey)
+        public constant returns (uint256[2] PubKey)
+    {
+        PubKey = ecMul(G1, privatekey);
+    }
+    
     function GetAddressFromPrivateKey(uint256 privatekey)
         public constant returns (address addr)
     {
-        uint256[2] memory temp;
-        temp = ecMul(G1, privatekey);
-        addr = GetAddress(temp);
+        addr = GetAddress(GetPublicKeyFromPrivateKey(privatekey));
     }
 
     //Return H = keccak256(p)

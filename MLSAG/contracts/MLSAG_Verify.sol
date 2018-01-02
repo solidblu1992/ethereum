@@ -12,7 +12,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //P = {P1x, P1y, P2x, P2y, ..., Pnx, Pny}
     //signature = {c1, s1, s2, ... , sn}
     function VerifySAG(bytes32 msgHash, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         //Check input array lengths
         MLSAGVariables memory v;
@@ -36,7 +36,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //P = {P1, P2, ... , Pn}
     //signature = {c1, s1, s2, ... , sn}
     function VerifySAG_Compressed(bytes32 msgHash, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         uint256[2] memory temp;
         uint256[] memory P_uncomp = new uint256[](P.length*2);
@@ -56,7 +56,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //P = {P1x, P1y, P2x, P2y, ..., Pnx, Pny}
     //signature = {c1, s1, s2, ..., sn}
     function VerifyLSAG(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         //Check input array lengths
         MLSAGVariables memory v;
@@ -84,7 +84,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //P = {P1, P2, ... , Pn}
     //signature = {c1, s1, s2, ... , sn}
     function VerifyLSAG_Compressed(bytes32 msgHash, uint256 I, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         uint256[2] memory temp;
         uint256[] memory P_uncomp = new uint256[](P.length*2);
@@ -112,7 +112,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //                  s21, s22, ..., s2m,
     //                  sn1, sn2, ..., snm  }
     function VerifyMSAG(uint256 m, bytes32 msgHash, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         //Check input array lengths
         MLSAGVariables memory v;
@@ -164,7 +164,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //                  s21, s22, ..., s2m,
     //                  sn1, sn2, ..., snm  }
     function VerifyMSAG_Compressed(uint256 m, bytes32 msgHash, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         uint256[2] memory temp;
         uint256[] memory P_uncomp = new uint256[](P.length*2);
@@ -189,7 +189,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //                  s21, s22, ..., s2m,
     //                  sn1, sn2, ..., snm  }
     function VerifyMLSAG(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         //Check input array lengths
         MLSAGVariables memory v;
@@ -244,7 +244,7 @@ contract MLSAG_Verify is MLSAG_Algorithms {
     //      Pn1, Pn2, ..., Pnm }
     //signature = {c1, s11, s12, ..., s1m, s21, s22, ..., s2m, ..., sn1, sn2, ..., snm}
     function VerifyMLSAG_Compressed(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
-        public constant returns (bool success)
+        internal constant returns (bool success)
     {
         uint256[2] memory temp;
         uint256[] memory P_uncomp = new uint256[](P.length*2);

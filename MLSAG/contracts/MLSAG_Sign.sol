@@ -1,4 +1,4 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.19;
 
 import "./MLSAG_Algorithms.sol";
 
@@ -132,12 +132,11 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             
             if (v.i > i) {
                 v.point1 = [Pin[2*v.i-2], Pin[2*v.i-1]];
-                (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             }
             else {
                 v.point1 = [Pin[2*v.i], Pin[2*v.i+1]];
-                (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             }
+            (Pout[2*v.i], Pout[2*v.i+1]) = (v.point1[0], v.point1[1]); //for usability only
             
             v.ck = CalculateLinkableRingSegment(msgHash, v.ck, random[v.i], v.point1, v.keyImage);
             
@@ -188,7 +187,9 @@ contract MLSAG_Sign is MLSAG_Algorithms {
     //msgHash = hash of message signed by ring signature
     //xk = known private key
     //i = index at which to put the known key
-    //P = {P11, P12, ..., P1m, P21, P22, ... P2m, P(n-1)1, P(n-1)2, ..., P(n-1)m}
+    //P = { P11x,     P11y,     P12x,     P12y,     ..., P1mx,     P1my,
+    //      P21x,     P21y,     P22x,     P22y,     ..., P2mx,     P2my,
+    //      P(n-1)1x, P(n-1)1y, P(n-1)2x, P(n-1)2y, ..., P(n-1)mx, P(n-1)my }
     //random = random numbers, need one for each public key (including the known ones)
     function SignMSAG(uint256 m, bytes32 msgHash, uint256[] xk, uint256[] i, uint256[] Pin, uint256[] random)
         public constant returns (uint256[] Pout, uint256[] signature)
@@ -198,12 +199,12 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         v.m = m;
         if(xk.length != v.m) revert();
         if(i.length != v.m) revert();
-        if (Pin.length % v.m != 0) revert();
-        v.n = (Pin.length / v.m)+1;
+        if (Pin.length % (2*v.m) != 0) revert();
+        v.n = (Pin.length / (2*v.m))+1;
         if (random.length != (v.m*v.n)) revert();
         
         //Initalize arrays
-        Pout = new uint256[](v.m*v.n);
+        Pout = new uint256[](2*v.m*v.n);
         signature = new uint256[](v.m*v.n+1);
 
         //Allocate array for calculating c1
@@ -218,10 +219,12 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             //Calculate (n-1) ring segments (output point for c1 calculation)
             v.j = ((i[v.i]+1) % v.n);
             
-            //No segment to calculate, just need starting segment to point
-            v.point2 = ecMul(G1, xk[v.i]);                  //for usability only
-            Pout[v.m*i[v.i]+v.i] = CompressPoint(v.point2); //for usability only
-                
+            //for usability only
+            v.index = v.m*i[v.i]+v.i;
+            v.point2 = ecMul(G1, xk[v.i]);                  
+            (Pout[2*v.index], Pout[2*v.index+1]) = (v.point2[0], v.point2[1]);
+            
+            //No segment to calculate, just need starting segment to point    
             if(i[v.i] == (v.n-1)) {
                 v.point1 = StartRing_NoHash(random[v.m*i[v.i]+v.i]);
             }
@@ -233,12 +236,11 @@ contract MLSAG_Sign is MLSAG_Algorithms {
                     v.index = v.m*v.j + v.i;
                     
                     if (v.j > i[v.i]) {
-                        v.point1 = ExpandPoint(Pin[v.index-v.m]); //extract public key
-                        Pout[v.index] = Pin[v.index-v.m]; //for usability only
+                        v.point1 = [Pin[2*v.index-2*v.m], Pin[2*v.index-2*v.m+1]]; //extract public key
                     } else {
-                        v.point1 = ExpandPoint(Pin[v.index]); //extract public key
-                        Pout[v.index] = Pin[v.index]; //for usability only
+                        v.point1 = [Pin[2*v.index], Pin[2*v.index+1]]; //extract public key
                     }
+                    (Pout[2*v.index], Pout[2*v.index+1]) = (v.point1[0], v.point1[1]); //for usability only
                     
                     v.ck = CalculateRingSegment(msgHash, v.ck, random[v.index], v.point1);
                     
@@ -247,9 +249,9 @@ contract MLSAG_Sign is MLSAG_Algorithms {
                 }
                 
                 //Calculate last ring segment (output EC point input for c1 calculation)
-                v.index = v.m*(v.n-1) + v.i;
-                v.point1 = ExpandPoint(Pin[v.index-v.m]);
-                Pout[v.index] = Pin[v.index-v.m]; //for usability only
+                v.index = (v.m*(v.n-1) + v.i);
+                v.point1 = [Pin[2*v.index-2*v.m], Pin[2*v.index-2*v.m+1]]; //extract public key
+                (Pout[2*v.index], Pout[2*v.index+1]) = (v.point1[0], v.point1[1]); //for usability only
                 
                 v.point1 = CalculateRingSegment_NoHash(v.ck, random[v.index], v.point1);
                 
@@ -274,8 +276,8 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             //Calculate remaining ring segments (output scalar ck)
             for (v.j = 0; v.j < i[v.i]; v.j++) {
                 v.index = v.m*v.j + v.i;
-                v.point1 = ExpandPoint(Pin[v.index]); //extract public key
-                Pout[v.index] = Pin[v.index]; //for usability only
+                v.point1 = [Pin[2*v.index], Pin[2*v.index+1]]; //extract public key
+                (Pout[2*v.index], Pout[2*v.index+1]) = (v.point1[0], v.point1[1]); //for usability only
                 
                 v.ck = CalculateRingSegment(msgHash, v.ck, random[v.index], v.point1);
                 
@@ -289,12 +291,39 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         }
     }
     
+    function SignMSAG_Compressed(uint256 m, bytes32 msgHash, uint256[] xk, uint256[] i, uint256[] Pin, uint256[] random)
+        public constant returns (uint256[] Pout, uint256[] signature)
+    {
+        //Expand Input Public Keys
+        uint256[] memory Pin_Uncomp = new uint256[](Pin.length*2);
+        uint256[2] memory temp;
+        
+        uint256 j;
+        for (j = 0; j < Pin.length; j++) {
+            temp = ExpandPoint(Pin[j]);
+            (Pin_Uncomp[2*j], Pin_Uncomp[2*j+1]) = (temp[0], temp[1]);
+        }
+        
+        uint256[] memory Pout_Uncomp;
+        
+        //Compress Output Public Keys
+        (Pout_Uncomp, signature) = SignMSAG(m, msgHash, xk, i, Pin_Uncomp, random);
+        Pout = new uint256[](Pout_Uncomp.length / 2);
+        
+        for (j = 0; j < Pout.length; j++) {
+            (temp[0], temp[1]) = (Pout_Uncomp[2*j], Pout_Uncomp[2*j+1]);
+            Pout[j] = CompressPoint(temp);
+        }
+    }
+    
     //Sign MLSAG (Multilayered Linkable Spontaneous Ad-hoc Group Signature)
     //m = number of keys in vector (# of inputs to be signed)
     //msgHash = hash of message signed by ring signature
     //xk = known private key
     //i = index at which to put the known key
-    //P = {P11, P12, ..., P1m, P21, P22, ... P2m, P(n-1)1, P(n-1)2, ..., P(n-1)m}
+    //P = { P11x,     P11y,     P12x,     P12y,     ..., P1mx,     P1my,
+    //      P21x,     P21y,     P22x,     P22y,     ..., P2mx,     P2my,
+    //      P(n-1)1x, P(n-1)1y, P(n-1)2x, P(n-1)2y, ..., P(n-1)mx, P(n-1)my }
     //random = random numbers, need one for each public key (including the known ones)
     function SignMLSAG(uint256 m, bytes32 msgHash, uint256[] xk, uint256[] i, uint256[] Pin, uint256[] random)
         public constant returns (uint256[] I, uint256[] Pout, uint256[] signature)
@@ -304,13 +333,13 @@ contract MLSAG_Sign is MLSAG_Algorithms {
         v.m = m;
         if(xk.length != v.m) revert();
         if(i.length != v.m) revert();
-        if (Pin.length % v.m != 0) revert();
-        v.n = (Pin.length / v.m)+1;
+        if (Pin.length % (2*v.m) != 0) revert();
+        v.n = (Pin.length / (2*v.m))+1;
         if (random.length != (v.m*v.n)) revert();
         
         //Initalize arrays
-        I = new uint256[](v.m);
-        Pout = new uint256[](v.m*v.n);
+        I = new uint256[](2*v.m);
+        Pout = new uint256[](2*v.m*v.n);
         signature = new uint256[](v.m*v.n+1);
 
         //Allocate array for calculating c1
@@ -324,15 +353,16 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             
             //Extract key image
             v.keyImage = CalculateKeyImageFromPrivKey(xk[v.i]);
-            I[v.i] = CompressPoint(v.keyImage);
+            (I[2*v.i], I[2*v.i+1]) = (v.keyImage[0], v.keyImage[1]);
             
             //Calculate (n-1) ring segments (output point for c1 calculation)
             v.j = ((i[v.i]+1) % v.n);
             
-            //No segment to calculate, just need starting segment to point
-            v.point2 = ecMul(G1, xk[v.i]);                  //for usability only
-            Pout[v.m*i[v.i]+v.i] = CompressPoint(v.point2); //for usability only
-                
+            //for usability only
+            v.index = v.m*i[v.i]+v.i;
+            v.point2 = ecMul(G1, xk[v.i]);                  
+            (Pout[2*v.index], Pout[2*v.index+1]) = (v.point2[0], v.point2[1]);
+            
             if(i[v.i] == (v.n-1)) {
                 (v.point1, v.point2) = StartLinkableRing_NoHash(random[v.m*i[v.i]+v.i], ecMul(G1, xk[v.i]));
             }
@@ -344,12 +374,12 @@ contract MLSAG_Sign is MLSAG_Algorithms {
                     v.index = v.m*v.j + v.i;
                     
                     if (v.j > i[v.i]) {
-                        v.point1 = ExpandPoint(Pin[v.index-v.m]); //extract public key
-                        Pout[v.index] = Pin[v.index-v.m]; //for usability only
+                        v.point1 = [Pin[2*v.index-2*v.m], Pin[2*v.index-2*v.m+1]]; //extract public key
                     } else {
-                        v.point1 = ExpandPoint(Pin[v.index]); //extract public key
-                        Pout[v.index] = Pin[v.index]; //for usability only
+                        v.point1 = [Pin[2*v.index], Pin[2*v.index+1]]; //extract public key
                     }
+                    (Pout[2*v.index], Pout[2*v.index+1]) = (v.point1[0], v.point1[1]); //for usability only
+                    
                     
                     v.ck = CalculateLinkableRingSegment(msgHash, v.ck, random[v.index], v.point1, v.keyImage);
                     
@@ -358,9 +388,9 @@ contract MLSAG_Sign is MLSAG_Algorithms {
                 }
                 
                 //Calculate last ring segment (output EC point input for c1 calculation)
-                v.index = v.m*(v.n-1) + v.i;
-                v.point1 = ExpandPoint(Pin[v.index-v.m]);
-                Pout[v.index] = Pin[v.index-v.m]; //for usability only
+                v.index = (v.m*(v.n-1) + v.i);
+                v.point1 = [Pin[2*v.index-2*v.m], Pin[2*v.index-2*v.m+1]]; //extract public key
+                (Pout[2*v.index], Pout[2*v.index+1]) = (v.point1[0], v.point1[1]); //for usability only
                 
                 (v.point1, v.point2) = CalculateLinkableRingSegment_NoHash(v.ck, random[v.index], v.point1, v.keyImage);
                 
@@ -390,8 +420,8 @@ contract MLSAG_Sign is MLSAG_Algorithms {
             //Calculate remaining ring segments (output scalar ck)
             for (v.j = 0; v.j < i[v.i]; v.j++) {
                 v.index = v.m*v.j + v.i;
-                v.point1 = ExpandPoint(Pin[v.index]); //extract public key
-                Pout[v.index] = Pin[v.index]; //for usability only
+                v.point1 = [Pin[2*v.index], Pin[2*v.index+1]]; //extract public key
+                (Pout[2*v.index], Pout[2*v.index+1]) = (v.point1[0], v.point1[1]); //for usability only
                 
                 v.ck = CalculateLinkableRingSegment(msgHash, v.ck, random[v.index], v.point1, v.keyImage);
                 

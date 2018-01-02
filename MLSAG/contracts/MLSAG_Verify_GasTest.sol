@@ -1,8 +1,8 @@
 pragma solidity ^0.4.19;
 
-import "./MLSAG_Verification_Algorithms.sol";
+import "./MLSAG_Verify.sol";
 
-contract MLSAG_Verification_GasTests is MLSAG_Verification_Algorithms {
+contract MLSAG_Verify_GasTests is MLSAG_Verify {
     function MLSAG_Verification_GasTests() public {
         //Constructor Code
     }

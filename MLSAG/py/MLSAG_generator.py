@@ -150,6 +150,36 @@ def sag_test(N=3):
     msgHash = rand()
     print("\"" + hex(msgHash) + "\",")
     xk = PrivKeys[0]
+    key = key+2
+    
+    print("\"" + xk + "\",")
+    j = random.randint(0,N-1)
+    print("\"" + str(j) + "\",")
+    print("[", end="")
+    
+    for i in range(0,2*N-2):
+        print("\"" + PubKeys[key], end="")
+        key = key + 1
+        if (i != (2*N-3)):
+            print("\",")
+        else:
+            print("\"],")
+
+    print("[", end="")
+    for i in range(0,N):
+        rnd = rand()
+        print("\"" + hex(rnd), end="")
+        if (i != (N-1)):
+            print("\",")
+        else:
+            print("\"]")
+
+def sag_test_comp(N=3):
+    import random
+    key = 0
+    msgHash = rand()
+    print("\"" + hex(msgHash) + "\",")
+    xk = PrivKeys[0]
     key = key+1
     
     print("\"" + xk + "\",")
@@ -157,7 +187,7 @@ def sag_test(N=3):
     print("\"" + str(j) + "\",")
     print("[", end="")
     for i in range(0,N-1):
-        print("\"" + PubKeys[key], end="")
+        print("\"" + PubKeys_Comp[key], end="")
         key = key + 1
         if (i != (N-2)):
             print("\",")
@@ -174,6 +204,54 @@ def sag_test(N=3):
             print("\"]")
 
 def msag_test(N=3, M=4):
+    import random
+    key = 0
+    
+    print("\"" + str(M) + "\",")
+    
+    msgHash = rand()
+    print("\"" + hex(msgHash) + "\",")
+
+    print("[", end="")
+    for i in range(0, M):
+        xk = PrivKeys[key]
+        key = key+2
+        print("\"" + xk, end="")
+        if (i != (M-1)):
+            print("\",")
+        else:
+            print("\"],")
+
+    print("[", end="")
+    for i in range(0, M):
+        j = random.randint(0,N-1)
+        print("\"" + str(j), end="")
+        if (i != (M-1)):
+            print("\",")
+        else:
+            print("\"],")
+
+    print("[", end="")
+        
+    for i in range(0,2*M*(N-1)):
+        print("\"" + PubKeys[key], end="")
+        key = key + 1
+        if (i != 2*M*(N-1)-1):
+            print("\",")
+        else:
+            print("\"],")
+
+    print("[", end="")
+        
+    for i in range(0,M*N):
+        rnd = rand()
+        print("\"" + hex(rnd), end="")
+        if (i != (M*N-1)):
+            print("\",")
+        else:
+            print("\"]")
+
+def msag_test_comp(N=3, M=4):
     import random
     key = 0
     
@@ -204,7 +282,7 @@ def msag_test(N=3, M=4):
     print("[", end="")
         
     for i in range(0,M*(N-1)):
-        print("\"" + PubKeys[key], end="")
+        print("\"" + PubKeys_Comp[key], end="")
         key = key + 1
         if (i != M*(N-1)-1):
             print("\",")

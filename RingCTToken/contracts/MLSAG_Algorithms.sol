@@ -17,6 +17,7 @@ contract MLSAG_Algorithms is ECMath {
         uint256 index;          //General purpose uint256 for picking index of arrays
         uint256[2] point1;      //Expanded EC Point for general purpose use
         uint256[2] point2;      //Expanded EC Point for general purpose use
+        uint256[2] point3;      //Expanded EC Point for general purpose use
         uint256[2] keyImage;    //Expanded EC Point representing key image
     }
     

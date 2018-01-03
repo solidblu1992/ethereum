@@ -5,4 +5,4 @@ CToE Token (https://ropsten.etherscan.io/address/0xeace8fbe35577a892a01a05220dea
 
 Stealth Addresses (Not yet deployed...)
 
-MLSAG (Not yet deployed...)
+RingCTToken (Not yet deployed...)

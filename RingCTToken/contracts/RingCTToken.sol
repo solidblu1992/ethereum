@@ -220,4 +220,58 @@ contract RingCTToken is MLSAG_Verify {
     {
         msgHash = keccak256(Keccak256OfArray(dest_pub_keys), Keccak256OfArray(output_commitments));
     }
+	
+	function AddColumnsToArray(uint256[] baseArray, uint256 baseWidth, uint256[] newColumns, uint256 newWidth)
+		public pure returns (uint256[] outArray)
+	{
+		//Check Array dimensions
+		if (baseArray.length % baseWidth != 0) return;
+		if (newColumns.length % newWidth != 0) return;
+		
+		uint256 n = baseArray.length / baseWidth;
+		if ( (newColumns.length / newWidth) != n ) return;
+		
+		//Create output Array
+		outArray = new uint256[](baseArray.length + newArray.length);
+		uint256 outWidth = baseWidth + newWidth;
+		
+		//Assemble new array
+		uint256 i;
+		uint256 j;
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < baseWidth; j++) {
+				//Copy over Base Array
+				outArray[outWidth*i + j] = baseArray[baseWidth*i + j];
+			}
+			
+			for (j = 0; j < newWidth; j++) {
+				//Copy over New Array
+				outArray[outWidth*i + baseWidth + j] = newArray[newWidth*i + j];
+			}
+		}
+	}
+	
+	function DropRightColumnsFromArray(uint256[] baseArray, uint256 baseWidth, uint256 colToDrop)
+		public pure returns (uint256[] outArray)
+	{
+		//Check Array Dimensions
+		if (baseArray.length % baseWidth != 0) return;
+		if (colToDrop > baseWidth) return;
+		
+		uint256 n = baseArray.length / baseWidth;
+		
+		//Create Output Array
+		outArray = new uint256[](baseArray.length - n*colToDrop);
+		uint256 outWidth = baseWidth - colToDrop;
+		
+		//Assemble new array
+		uint256 i;
+		uint256 j;
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < outWidth; j++) {
+				//Copy only relevant elements over
+				outArray[outWidth*i + j] = baseArray[baseWidth*i + j];
+			}
+		}
+	}
 }

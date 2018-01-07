@@ -176,7 +176,7 @@ contract ECMath is Debuggable {
     function HashOfPoint(uint256[2] point)
         internal pure returns (uint256 h)
     {
-        return uint256(keccak256(point[0], point[1])) % NCurve;
+        return uint256(keccak256(point[0], point[1]));
     }
     
 	//Return H = alt_bn128 evaluated at keccak256(p)
@@ -184,12 +184,17 @@ contract ECMath is Debuggable {
         internal constant returns (uint256[2] h)
     {
         bool onCurve;
-        h[0] = uint256(HashOfPoint(p)) % NCurve;
+        h[0] = uint256(HashOfPoint(p)) % PCurve;
         
-        while(!onCurve) {
+        while(true) {
             (h[1], onCurve) = EvaluateCurve(h[0]);
-            h[0]++;
+            
+			if (onCurve) {
+				break;
+			}
+			else {
+				h[1] = addmod(h[1], 1, PCurve);
+			}
         }
-        h[0]--;
     }
 }

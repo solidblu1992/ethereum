@@ -14,10 +14,43 @@ def bytes_to_int(bytes):
 
     return result
 
+def int_to_iterable(i):
+    x = []
+    bits = 0
+    while i > 0:
+        y = i & (0xFF << bits)
+        x = [(y >> bits)] + x
+        i = i - y
+        bits = bits + 8
+
+    return x
+
+def int_to_bytes32(i):
+    x = bytes(int_to_iterable(i% 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
+
+    if (len(x) < 32):
+        y = bytes(32 - len(x))
+        x = y+x
+
+    return x
+
+def print_point(p):
+    if (type(p) == tuple):
+        p = CompressPoint(p)
+    
+    s = hex(p)
+    if (len(s) != 66):
+        y = 66 - len(s)
+        y = "0" * y
+        s = "0x" + y + s[2:]
+            
+    print(s)
+        
+
 def hash_point(p):
     hasher = sha3.keccak_256()
-    hasher.update(bytes(p[0].n))
-    hasher.update(bytes(p[1].n))
+    hasher.update(int_to_bytes32(p[0].n))
+    hasher.update(int_to_bytes32(p[1].n))
     x = bytes_to_int(hasher.digest()) % Pcurve
     
     while(True):
@@ -33,13 +66,10 @@ def hash_point(p):
 
 #Utility Functions
 def CompressPoint(Pin):
-    if (len(Pin) != 2):
-        return 0
-
-    if (Pin[1] > (Pcurve // 2)):
-        Pout = Pin[0] | (ECSignMask)
+    if (Pin[1].n > (Pcurve // 2)):
+        Pout = Pin[0].n | (ECSignMask)
     else:
-        Pout = Pin[0]
+        Pout = Pin[0].n
 
     return Pout
 
@@ -55,7 +85,7 @@ def ExpandPoint(Pin):
         if (Pin & ECSignMask != 0):
             y = Pcurve - y
 
-    Pout = [Pin & (~ECSignMask), y]
+    Pout = (FQ(Pin & (~ECSignMask)), FQ(y))
     return Pout
 
 def keccak256(msg):
@@ -73,19 +103,29 @@ def point_to_hex(p):
 
 H = hash_point(G1)
 
-MyPrivateViewKey = getRandom()
-MyPublicViewKey = multiply(G1, MyPrivateViewKey)
+class RingCTToken:
+    MyPrivateViewKey = 0
+    MyPublicViewKey = (FQ(0), FQ(0))
+    
+    MyPrivateSpendKey = 0
+    MyPublicSpendKey = (FQ(0), FQ(0))
 
-MyPrivateSpendKey = getRandom()
-MyPublicSpendKey = multiply(G1, MyPrivateSpendKey)
+    def GenerateNewStealthAddress(self):
+        self.MyPrivateViewKey = getRandom()
+        self.MyPrivateSpendKey = getRandom()
+
+        self.MyPublicViewKey = multiply(G1, self.MyPrivateViewKey)
+        self.MyPublicSpendKey = multiply(G1, self.MyPrivateSpendKey)
+
+    def PrintStealthAddress(self):
+        print(hex(CompressPoint(self.MyPublicViewKey)))
+        print(hex(CompressPoint(self.MyPublicSpendKey)))
+    
+    def __init__(self):
+        self.GenerateNewStealthAddress()
+        
 
 #Stealth Address Functions
-def GenerateMyStealthAddress():
-    MyPrivateViewKey = getRandom()
-    MyPrivateSpendKey = getRandom()
 
-    MyPublicViewKey = ecMul(G1, MyPrivateViewKey)
-    MyPublicSpendKey = ecMul(G1, MyPublicSpendKey)
-    (MyStealthAddress[0], MyStealthAddress[1]) = ecMul(G1, MyPrivateViewKey)
 
 #Transaction Functions

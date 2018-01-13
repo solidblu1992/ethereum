@@ -106,20 +106,20 @@ class PCAESMessage:
         self.message = message
         self.iv = iv
         
-    def Encrypt(value, blinding_factor, ss_point):
+    def Encrypt(value, blinding_factor, shared_secret):
         from Crypto.Cipher import AES
         from Crypto import Random
-        key = int_to_bytes32(hash_of_point(ss_point))
+        key = int_to_bytes32(shared_secret)
         iv = Random.new().read(AES.block_size)
         cipher = AES.new(key, AES.MODE_CFB, iv)
         message = cipher.encrypt(int_to_bytes32(value) + int_to_bytes32(blinding_factor))
         
         return PCAESMessage(message, iv)
 
-    def Decrypt(self, ss_point):
+    def Decrypt(self, shared_secret):
         from Crypto.Cipher import AES
         from Crypto import Random
-        key = int_to_bytes32(hash_of_point(ss_point))
+        key = int_to_bytes32(shared_secret)
         cipher = AES.new(key, AES.MODE_CFB, self.iv)
         msg = cipher.decrypt(self.message)
 
@@ -128,6 +128,20 @@ class PCAESMessage:
 
         return (value, bf)
 
+    def to_scalars(self):
+        from Crypto import Random
+        rand = Random.new();
+        return [bytes_to_int(rand.read(1) + self.message[:31]) % Ncurve,
+                bytes_to_int(rand.read(1) + self.message[31:62]) % Ncurve,
+                bytes_to_int(rand.read(14) + self.message[62:] + self.iv) % Ncurve]
+
+    def from_scalars(s):
+        assert(len(s) == 3)
+        message = int_to_bytes32(s[0])[2:] + int_to_bytes32(s[1])[2:] + int_to_bytes32(s[2])[14:16]
+        iv = int_to_bytes32(s[2])[16:]
+        
+        return PCAESMessage(message, iv)
+        
     def Print(self):
         print("Encrypted Message: " + hex(bytes_to_int(self.message)))
         print("iv: " + hex(bytes_to_int(self.iv)))
@@ -158,11 +172,11 @@ def AESTest():
 
     v = value*(10**pow10)+offset
     print("Hiding " + str(v) + " and blinding factor " + hex(bf))
-    ss_point = multiply(G1, getRandom())
-    msg = PCAESMessage.Encrypt(v, bf, ss_point)
+    shared_secret = hash_of_point(multiply(G1, getRandom()))
+    msg = PCAESMessage.Encrypt(v, bf, shared_secret)
     msg.Print()
 
-    (v2, bf2) = msg.Decrypt(ss_point)
+    (v2, bf2) = msg.Decrypt(shared_secret)
     print("Recovered " + str(v2) + " and blinding factor " + hex(bf2))
 
     

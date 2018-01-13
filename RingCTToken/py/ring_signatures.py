@@ -1,5 +1,4 @@
 from bn128_curve import *
-from aes import *
 import sha3
 
 #alt_bn_128 curve parameters
@@ -92,26 +91,26 @@ H = hash_to_point(G1)
 
 #Utility Functions
 def CompressPoint(Pin):
+    Pout = Pin[0].n
     if (Pin[1].n > (Pcurve // 2)):
-        Pout = Pin[0].n | (ECSignMask)
-    else:
-        Pout = Pin[0].n
+        Pout = Pout | (ECSignMask)
 
     return Pout
 
 def ExpandPoint(Pin):
     import math
-    y_squared = (Pin**3 + 3) % Ncurve
+    y_squared = (Pin**3 + 3) % Pcurve
     y = pow(y_squared, (Pcurve+1)//4, Pcurve)
+
+    Pout = (FQ(Pin & (~ECSignMask)), FQ(y))
 
     if (y > (Pcurve // 2)):
         if (Pin & ECSignMask == 0):
-            y = Pcurve - y
+            Pout = neg(Pout)
     else:
         if (Pin & ECSignMask != 0):
-            y = Pcurve - y
+            Pout = neg(Pout)
 
-    Pout = (FQ(Pin & (~ECSignMask)), FQ(y))
     return Pout
 
 def getRandom():
@@ -119,6 +118,7 @@ def getRandom():
     out = (random.getrandbits(254) % Ncurve)
     return out
 
+#Ring Signature Functions
 class MSAG:
     msgHash = 0
     m = 0
@@ -165,16 +165,12 @@ class MSAG:
 
     #Pin is an m x (n-1) array.  Every key in Pin is used.
     #The keys for xk are calculated and substituted in at the appropriate time
-    def Sign_CompactPin(m, msgHash, xk, indices, Pin):
+    def Sign_CompactPin(m, msgHash, xk, indices, Pin, random):
         assert(len(xk) == m)
         assert(len(indices) == m)
         assert( (len(Pin) % m ) == 0)
         n = (len(Pin) // m) + 1
-
-        #Create Random Numbers
-        random = []
-        for i in range(0, (m*n)):
-            random = random + [getRandom()]
+        assert( len(random) == m*n )
 
         #Initialize Output Arrays
         Pout = [0]*(m*n)
@@ -260,18 +256,28 @@ class MSAG:
 
         return MSAG(msgHash, m, Pout, signature)
 
-    #Pin is an n x m array.  The elements corrosponding to xk in the array don't count however.
-    #These keys are calculated from xk and substituted in at the appropriate time.
-    def Sign(m, msgHash, xk, indices, Pin):
+    #Picks random numbers before signing
+    def Sign_CompactPin_GenRandoms(m, msgHash, xk, indices, Pin):
         assert(len(xk) == m)
         assert(len(indices) == m)
         assert( (len(Pin) % m ) == 0)
-        n = (len(Pin) // m)
-
+        n = (len(Pin) // m) + 1
+        
         #Create Random Numbers
         random = []
         for i in range(0, (m*n)):
             random = random + [getRandom()]
+
+        return MSAG.Sign_CompactPin(msgHash, m, xk, indices, random)
+
+    #Pin is an n x m array.  The elements corrosponding to xk in the array don't count however.
+    #These keys are calculated from xk and substituted in at the appropriate time.
+    def Sign(m, msgHash, xk, indices, Pin, random):
+        assert(len(xk) == m)
+        assert(len(indices) == m)
+        assert( (len(Pin) % m ) == 0)
+        n = (len(Pin) // m)
+        assert( len(random) == m*n )
 
         #Initialize Output Arrays
         Pout = [0]*(m*n)
@@ -353,6 +359,19 @@ class MSAG:
             signature[index+1] = MSAG.CompleteRing(random[index], ck, xk[i])
 
         return MSAG(msgHash, m, Pout, signature)
+
+    def Sign_GenRandom(m, msgHash, xk, indices, Pin):
+        assert(len(xk) == m)
+        assert(len(indices) == m)
+        assert( (len(Pin) % m ) == 0)
+        n = (len(Pin) // m)
+        
+        #Create Random Numbers
+        random = []
+        for i in range(0, (m*n)):
+            random = random + [getRandom()]
+
+        return MSAG.Sign(m, msgHash, xk, indices, Pin, random)
 
     def Verify(self):
         #Check input parameter lengths
@@ -457,16 +476,12 @@ class MLSAG:
 
     #Pin is an m x (n-1) array.  Every key in Pin is used.
     #The keys for xk are calculated and substituted in at the appropriate time
-    def Sign(m, msgHash, xk, indices, Pin):
+    def Sign_CompactPin(m, msgHash, xk, indices, Pin, random):
         assert(len(xk) == m)
         assert(len(indices) == m)
         assert( (len(Pin) % m ) == 0)
         n = (len(Pin) // m) + 1
-
-        #Create Random Numbers
-        random = []
-        for i in range(0, (m*n)):
-            random = random + [getRandom()]
+        assert( len(random) == m*n )
 
         #Initialize Output Arrays
         Pout = [0]*(m*n)
@@ -562,18 +577,28 @@ class MLSAG:
 
         return MLSAG(msgHash, I, Pout, signature)
 
-    #Pin is an n x m array.  The elements corrosponding to xk in the array don't count however.
-    #These keys are calculated from xk and substituted in at the appropriate time.
-    def Sign(m, msgHash, xk, indices, Pin):
+    #Picks random numbers
+    def Sign_CompactPin_GenRandom(m, msgHash, xk, indices, Pin):
         assert(len(xk) == m)
         assert(len(indices) == m)
         assert( (len(Pin) % m ) == 0)
-        n = (len(Pin) // m)
-
+        n = (len(Pin) // m) + 1
+        
         #Create Random Numbers
         random = []
         for i in range(0, (m*n)):
             random = random + [getRandom()]
+
+        return MLSAG.Sign_CompactPin(m, msgHash, xk, indices, Pin, random)
+
+    #Pin is an n x m array.  The elements corrosponding to xk in the array don't count however.
+    #These keys are calculated from xk and substituted in at the appropriate time.
+    def Sign(m, msgHash, xk, indices, Pin, random):
+        assert(len(xk) == m)
+        assert(len(indices) == m)
+        assert( (len(Pin) % m ) == 0)
+        n = (len(Pin) // m)
+        assert( len(random) == m*n )
 
         #Initialize Output Arrays
         Pout = [0]*(m*n)
@@ -665,7 +690,21 @@ class MLSAG:
             signature[index+1] = MLSAG.CompleteRing(random[index], ck, xk[i])
 
         return MLSAG(msgHash, I, Pout, signature)
-    
+
+    #Create Random Numbers before signing
+    def Sign_GenRandom(m, msgHash, xk, indices, Pin):
+        assert(len(xk) == m)
+        assert(len(indices) == m)
+        assert( (len(Pin) % m ) == 0)
+        n = (len(Pin) // m)
+        
+        #Create random numbers
+        random = []
+        for i in range(0, (m*n)):
+            random = random + [getRandom()]
+
+        return MLSAG.Sign(m, msgHash, xk, indices, random)
+            
     def Verify(self):
         #Check input parameter lengths
         m = len(self.key_images)

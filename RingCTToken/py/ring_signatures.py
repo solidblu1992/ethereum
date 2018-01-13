@@ -163,7 +163,9 @@ class MSAG:
         s = (alpha + s) % Ncurve
         return s
 
-    def Sign(m, msgHash, xk, indices, Pin):
+    #Pin is an m x (n-1) array.  Every key in Pin is used.
+    #The keys for xk are calculated and substituted in at the appropriate time
+    def Sign_CompactPin(m, msgHash, xk, indices, Pin):
         assert(len(xk) == m)
         assert(len(indices) == m)
         assert( (len(Pin) % m ) == 0)
@@ -219,6 +221,100 @@ class MSAG:
 
                 #Extract Public Key
                 point = Pin[index-m]
+                Pout[index] = point
+
+                point = MSAG.CalculateRingSegment_NoHash(ck, random[index], point)
+
+                #Store s value
+                signature[index+1] = random[index]
+                
+            #Store update c1 hash
+            hasher.update(int_to_bytes32(point[0].n))
+            hasher.update(int_to_bytes32(point[1].n))
+
+        #Store c1
+        signature[0] = bytes_to_int(hasher.digest())
+
+        #Calculate 2nd half of each ring
+        for i in range(0, m):
+            #Fetch c1
+            ck = signature[0]
+
+            #Calculate remaining ring segments
+            for j in range(0, indices[i]):
+                index = m*j+i
+
+                #Extract public key
+                point = Pin[index]
+                Pout[index] = point
+
+                #Calculate Ring Segment
+                ck = MSAG.CalculateRingSegment(msgHash, ck, random[index], point)
+
+                #Store s value
+                signature[index+1] = random[index]
+
+            #Close Ring
+            index = m*indices[i] + i
+            signature[index+1] = MSAG.CompleteRing(random[index], ck, xk[i])
+
+        return MSAG(msgHash, m, Pout, signature)
+
+    #Pin is an n x m array.  The elements corrosponding to xk in the array don't count however.
+    #These keys are calculated from xk and substituted in at the appropriate time.
+    def Sign(m, msgHash, xk, indices, Pin):
+        assert(len(xk) == m)
+        assert(len(indices) == m)
+        assert( (len(Pin) % m ) == 0)
+        n = (len(Pin) // m)
+
+        #Create Random Numbers
+        random = []
+        for i in range(0, (m*n)):
+            random = random + [getRandom()]
+
+        #Initialize Output Arrays
+        Pout = [0]*(m*n)
+        signature = [0]*(m*n+1)
+
+        #Initialize c1 hasher
+        hasher = sha3.keccak_256()
+        hasher.update(msgHash)
+
+        #Calulate 1st half of all rings (for c1 calculation)
+        for i in range(0, m):
+            #Make sure index is mod n
+            indices[i] = indices[i] % n
+
+            #Store public key for known private key
+            Pout[m*indices[i]+i] = multiply(G1, xk[i])
+            
+            if (indices[i] == (n-1)):
+                point = MSAG.StartRing_NoHash(random[m*indices[i]+i])
+            else:
+                ck = MSAG.StartRing(msgHash, random[m*indices[i]+i])
+
+                for j in range((indices[i]+1)%n,(n-1)):
+                    #Calculate array index for easy reference
+                    index = m*j+i
+                    
+                    #Extract input public key
+                    point = Pin[index]
+
+                    #Store public key in output
+                    Pout[index] = point
+
+                    #Calculate ring segment
+                    ck = MSAG.CalculateRingSegment(msgHash, ck, random[index], point)
+
+                    #Store s value
+                    signature[index+1] = random[index]
+
+                #Calculate last ring segment before c1
+                index = m*(n-1) + i
+
+                #Extract Public Key
+                point = Pin[index]
                 Pout[index] = point
 
                 point = MSAG.CalculateRingSegment_NoHash(ck, random[index], point)
@@ -359,6 +455,8 @@ class MLSAG:
         s = (alpha + s) % Ncurve
         return s
 
+    #Pin is an m x (n-1) array.  Every key in Pin is used.
+    #The keys for xk are calculated and substituted in at the appropriate time
     def Sign(m, msgHash, xk, indices, Pin):
         assert(len(xk) == m)
         assert(len(indices) == m)
@@ -464,6 +562,110 @@ class MLSAG:
 
         return MLSAG(msgHash, I, Pout, signature)
 
+    #Pin is an n x m array.  The elements corrosponding to xk in the array don't count however.
+    #These keys are calculated from xk and substituted in at the appropriate time.
+    def Sign(m, msgHash, xk, indices, Pin):
+        assert(len(xk) == m)
+        assert(len(indices) == m)
+        assert( (len(Pin) % m ) == 0)
+        n = (len(Pin) // m)
+
+        #Create Random Numbers
+        random = []
+        for i in range(0, (m*n)):
+            random = random + [getRandom()]
+
+        #Initialize Output Arrays
+        Pout = [0]*(m*n)
+        signature = [0]*(m*n+1)
+        I = [0]*m
+
+        #Initialize c1 hasher
+        hasher = sha3.keccak_256()
+        hasher.update(msgHash)
+
+        #Calulate 1st half of all rings (for c1 calculation)
+        for i in range(0, m):
+            #Make sure index is mod n
+            indices[i] = indices[i] % n
+
+            #Calculate Key Image and Store for later use
+            keyImage = multiply(hash_to_point(multiply(G1,xk[i])), xk[i])
+            I[i] = keyImage
+
+            #Store public key for known private key
+            Pout[m*indices[i]+i] = multiply(G1, xk[i])
+            
+            if (indices[i] == (n-1)):
+                (left, right) = MLSAG.StartLinkableRing_NoHash(random[m*indices[i]+i], multiply(G1, xk[i]))
+            else:
+                ck = MLSAG.StartLinkableRing(msgHash, random[m*indices[i]+i], multiply(G1, xk[i]))
+
+                for j in range((indices[i]+1)%n,(n-1)):
+                    #Calculate array index for easy reference
+                    index = m*j+i
+                    
+                    #Extract input public key
+                    point = Pin[index]
+
+                    #Store public key in output
+                    Pout[index] = point
+
+                    #Calculate ring segment
+                    ck = MLSAG.CalculateLinkableRingSegment(msgHash, ck, random[index], point, keyImage)
+
+                    #Store s value
+                    signature[index+1] = random[index]
+
+                #Calculate last ring segment before c1
+                index = m*(n-1) + i
+
+                #Extract Public Key
+                point = Pin[index]
+                Pout[index] = point
+
+                (left, right) = MLSAG.CalculateLinkableRingSegment_NoHash(ck, random[index], point, keyImage)
+
+                #Store s value
+                signature[index+1] = random[index]
+                
+            #Store update c1 hash
+            hasher.update(int_to_bytes32(left[0].n))
+            hasher.update(int_to_bytes32(left[1].n))
+            hasher.update(int_to_bytes32(right[0].n))
+            hasher.update(int_to_bytes32(right[1].n))
+
+        #Store c1
+        signature[0] = bytes_to_int(hasher.digest())
+
+        #Calculate 2nd half of each ring
+        for i in range(0, m):
+            #Fetch c1
+            ck = signature[0]
+
+            #Extract Key Image
+            keyImage = I[i]
+
+            #Calculate remaining ring segments
+            for j in range(0, indices[i]):
+                index = m*j+i
+
+                #Extract public key
+                point = Pin[index]
+                Pout[index] = point
+
+                #Calculate Ring Segment
+                ck = MLSAG.CalculateLinkableRingSegment(msgHash, ck, random[index], point, keyImage)
+
+                #Store s value
+                signature[index+1] = random[index]
+
+            #Close Ring
+            index = m*indices[i] + i
+            signature[index+1] = MLSAG.CompleteRing(random[index], ck, xk[i])
+
+        return MLSAG(msgHash, I, Pout, signature)
+    
     def Verify(self):
         #Check input parameter lengths
         m = len(self.key_images)

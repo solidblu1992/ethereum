@@ -25,6 +25,59 @@ class PCRangeProof:
         self.total_commitment = total_commitment
         self.range_proof = range_proof
 
+
+    def Commit(value, blinding_factor):
+        point = multiply(G1, blinding_factor)
+        temp = multiply(H, value)
+        point = add(point, temp)
+            
+        return point
+
+    def Generate(value, pow10, offset, bits_override, total_blinding_factor):
+        #Figure out how many bits value is in base 4
+        import math
+        bits = math.floor(math.log(value,4))+1
+
+        if (bits_override > bits):
+            bits = bits_override
+
+        c = []
+        cp = []
+        cpp = []
+        cppp = []
+        keys = []
+        indices = []
+        commitments = []
+        bfTotal = 0
+        for i in range(0, bits):
+            v = (value & (3 << (2*i))) >> (2*i)
+
+            if i < (bits-1):
+                bf = getRandom()
+                bfTotal = bfTotal + bf
+            else:
+                bf = (total_blinding_factor - bfTotal) % Ncurve
+
+            keys = keys + [bf]
+            indices = indices + [v]
+                
+                
+            p1 = PCRangeProof.Commit(v * (4**i) * (10**pow10), bf)
+            p2 = neg(multiply(H, (4**i)*(10**pow10)))
+            
+            c = c + [p1]            
+            p1 = add(p1, p2)
+            cp = cp + [p1]
+            p1 = add(p1, p2)
+            cpp = cpp + [p1]
+            p1 = add(p1, p2)
+            cppp = cppp + [p1]
+
+
+        commitments = c + cp + cpp + cppp
+        return PCRangeProof(pow10, offset, PCRangeProof.Commit(value*(10**pow10)+offset, total_blinding_factor), MSAG.Sign(bits, bytes(0), keys, indices, commitments))
+            
+
     def Verify(self):
         L = len(self.range_proof.pub_keys)
         if (L % 4 != 0): return False
@@ -58,8 +111,6 @@ class PCRangeProof:
         self.range_proof.Print()
 
         
-        
-
 class RingCTToken:
     MyPrivateViewKey = 0
     MyPublicViewKey = (FQ(0), FQ(0))
@@ -86,57 +137,6 @@ class RingCTToken:
         for i in range(0, n):
             self.GenerateNewAddress()
 
-    def GenerateCommitment(value, blinding_factor):
-        point = multiply(G1, blinding_factor)
-        temp = multiply(H, value)
-        point = add(point, temp)
-            
-        return point
-
-    def GenerateRangeProof(value, pow10, offset, bits_override, total_blinding_factor):
-        #Figure out how many bits value is in base 4
-        import math
-        bits = math.floor(math.log(value,4))+1
-
-        if (bits_override > bits):
-            bits = bits_override
-
-        c = []
-        cp = []
-        cpp = []
-        cppp = []
-        keys = []
-        indices = []
-        commitments = []
-        bfTotal = 0
-        for i in range(0, bits):
-            v = (value & (3 << (2*i))) >> (2*i)
-
-            if i < (bits-1):
-                bf = getRandom()
-                bfTotal = bfTotal + bf
-            else:
-                bf = (total_blinding_factor - bfTotal) % Ncurve
-
-            keys = keys + [bf]
-            indices = indices + [v]
-                
-                
-            p1 = RingCTToken.GenerateCommitment(v * (4**i) * (10**pow10), bf)
-            p2 = neg(multiply(H, (4**i)*(10**pow10)))
-            
-            c = c + [p1]            
-            p1 = add(p1, p2)
-            cp = cp + [p1]
-            p1 = add(p1, p2)
-            cpp = cpp + [p1]
-            p1 = add(p1, p2)
-            cppp = cppp + [p1]
-
-
-        commitments = c + cp + cpp + cppp
-        return PCRangeProof(pow10, offset, RingCTToken.GenerateCommitment(value*(10**pow10)+offset, total_blinding_factor), MSAG.Sign(bits, bytes(0), keys, indices, commitments))
-            
     def GenerateStealthTx(self, pubViewKey, pubSpendKey, data):
         r = getRandom()
         R = multiply(G1, r)
@@ -173,7 +173,7 @@ def RangeProofTest():
     
     print("Generating " + str(bits) + "-bit Range Proof for " + str(value) + "x(10**" + str(pow10) + ")+" + str(offset) + " = " + str(value*(10**pow10)+offset))
     print("Blinding factor = " + str(bf))
-    rp = RingCTToken.GenerateRangeProof(45, 18, 0, 4, 100)
+    rp = PCRangeProof.Generate(45, 18, 0, 4, 100)
     rp.Print()
 
     print("\nVerifing Range proof...", end="")

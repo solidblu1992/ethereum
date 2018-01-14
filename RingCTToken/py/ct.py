@@ -201,7 +201,7 @@ class PCAESMessage:
 def RangeProofTest():
     value = 48
     pow10 = 18
-    offset = 0
+    offset = 10**17
     bits = 5
     bf = getRandom()
     

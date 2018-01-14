@@ -732,7 +732,7 @@ class MLSAG:
         for i in range(0, (m*n)):
             random = random + [getRandom()]
 
-        return MLSAG.Sign(m, msgHash, xk, indices, random)
+        return MLSAG.Sign(m, msgHash, xk, indices, Pin, random)
             
     def Verify(self):
         #Check input parameter lengths
@@ -811,7 +811,7 @@ def MSAG_Test(m=4, n=3):
     hasher.update(msg)
     msgHash = int_to_bytes32(bytes_to_int(hasher.digest()))
     
-    msag_signature = MSAG.Sign(m, msgHash, xk, indices, pub_keys)
+    msag_signature = MSAG.Sign_GenRandom(m, msgHash, xk, indices, pub_keys)
     msag_signature.Print()
 
     if (msag_signature.Verify()):
@@ -840,7 +840,7 @@ def MLSAG_Test(m=4, n=3):
     hasher.update(msg)
     msgHash = int_to_bytes32(bytes_to_int(hasher.digest()))
     
-    mlsag_signature = MLSAG.Sign(m, msgHash, xk, indices, pub_keys)
+    mlsag_signature = MLSAG.Sign_GenRandom(m, msgHash, xk, indices, pub_keys)
     mlsag_signature.Print()
 
     if (mlsag_signature.Verify()):

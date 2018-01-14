@@ -191,7 +191,7 @@ contract ECMath is Debuggable {
             (h[1], onCurve) = EvaluateCurve(h[0]);
             
 			if (!onCurve) {
-				h[1] = addmod(h[1], 1, PCurve);
+				h[0] = addmod(h[0], 1, PCurve);
 			}
         }
     }

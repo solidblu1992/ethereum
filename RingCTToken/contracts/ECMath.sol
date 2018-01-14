@@ -174,9 +174,10 @@ contract ECMath is Debuggable {
 
     //Return H = keccak256(p)
     function HashOfPoint(uint256[2] point)
-        internal pure returns (uint256 h)
+        internal pure returns (uint256)
     {
-        return uint256(keccak256(point[0], point[1]));
+        uint256 h = uint256(keccak256(point[0], point[1]));
+        return h;
     }
     
 	//Return H = alt_bn128 evaluated at keccak256(p)

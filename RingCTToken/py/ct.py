@@ -98,6 +98,34 @@ class PCRangeProof:
         print("Range Proof:")
         self.range_proof.Print()
 
+    #Prints range proof in a format to be verified on the Ethereum blockchain
+    def Print_Ethereum(self):
+        L = len(self.range_proof.pub_keys)
+        if (L % 4 != 0): return False
+        L = L // 4
+
+        #Print Total Commitment
+        commitment = self.GetTotalCommitment()
+        print("[\"" + hex(commitment[0].n) + "\",\"" + hex(commitment[1].n) + "\"],")
+        print("\"" + str(self.pow10) + "\",\"" + str(self.offset) + "\",")
+
+        #Print Bitwise Commitments
+        print("[", end="")
+        for i in range(0, L-1):
+            print("\"" + hex(self.range_proof.pub_keys[i][0].n) + "\",\"" + hex(self.range_proof.pub_keys[i][1].n) + "\",")
+
+        print("\"" + hex(self.range_proof.pub_keys[L-1][0].n) + "\",\"" + hex(self.range_proof.pub_keys[L-1][1].n) + "\"],")
+
+        #Print Signature
+        L = len(self.range_proof.signature)
+        print("[", end="")
+        for i in range(0, L-1):
+            print("\"" + hex(self.range_proof.signature[i]) + "\",")
+
+        print("\"" + hex(self.range_proof.signature[L-1]) + "\"]")
+        
+        
+
 class PCAESMessage:
     message = b""
     iv = b""
@@ -163,6 +191,8 @@ def RangeProofTest():
         print("Success!")
     else:
         print("Failure!")
+
+    rp.Print_Ethereum()
 
 def AESTest():
     value = 48

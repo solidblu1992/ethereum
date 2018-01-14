@@ -1,3 +1,4 @@
+
 from ring_signatures import *
 
 class PCRangeProof:
@@ -75,7 +76,7 @@ class PCRangeProof:
         point = multiply(H, self.offset)
         for i in range(0, L):
             point = add(point, self.range_proof.pub_keys[i])
-
+        
         if (not eq(point, self.GetTotalCommitment())): return False
 
         #Check that counter commitments are OK
@@ -97,32 +98,56 @@ class PCRangeProof:
         print("Possible # of Values = " + str(4**L-1))
         print("Range Proof:")
         self.range_proof.Print()
+        
 
     #Prints range proof in a format to be verified on the Ethereum blockchain
-    def Print_Ethereum(self):
+    def Print_Remix(self):
         L = len(self.range_proof.pub_keys)
         if (L % 4 != 0): return False
         L = L // 4
 
         #Print Total Commitment
         commitment = self.GetTotalCommitment()
-        print("[\"" + hex(commitment[0].n) + "\",\"" + hex(commitment[1].n) + "\"],")
+        print("[\"" + hex(commitment[0].n) + "\",\n\"" + hex(commitment[1].n) + "\"],")
         print("\"" + str(self.pow10) + "\",\"" + str(self.offset) + "\",")
 
         #Print Bitwise Commitments
         print("[", end="")
         for i in range(0, L-1):
-            print("\"" + hex(self.range_proof.pub_keys[i][0].n) + "\",\"" + hex(self.range_proof.pub_keys[i][1].n) + "\",")
+            print("\"" + hex(self.range_proof.pub_keys[i][0].n) + "\",\n\"" + hex(self.range_proof.pub_keys[i][1].n) + "\",")
 
-        print("\"" + hex(self.range_proof.pub_keys[L-1][0].n) + "\",\"" + hex(self.range_proof.pub_keys[L-1][1].n) + "\"],")
+        print("\"" + hex(self.range_proof.pub_keys[L-1][0].n) + "\",\n\"" + hex(self.range_proof.pub_keys[L-1][1].n) + "\"],")
 
         #Print Signature
         L = len(self.range_proof.signature)
-        print("[", end="")
+        print("", end="")
         for i in range(0, L-1):
             print("\"" + hex(self.range_proof.signature[i]) + "\",")
 
-        print("\"" + hex(self.range_proof.signature[L-1]) + "\"]")
+        print("\"" + hex(self.range_proof.signature[L-1]) + "\"")
+
+    def Print_MEW(self):
+        L = len(self.range_proof.pub_keys)
+        if (L % 4 != 0): return False
+        L = L // 4
+
+        #Print Total Commitment
+        commitment = self.GetTotalCommitment()
+        print(hex(commitment[0].n) + ",\n" + hex(commitment[1].n) + "\n")
+        print(str(self.pow10) + "\n" + str(self.offset) + ",\n")
+
+        #Print Bitwise Commitments
+        for i in range(0, L-1):
+            print(hex(self.range_proof.pub_keys[i][0].n) + ",\n" + hex(self.range_proof.pub_keys[i][1].n) + ",")
+
+        print(hex(self.range_proof.pub_keys[L-1][0].n) + ",\n" + hex(self.range_proof.pub_keys[L-1][1].n) + "\n")
+
+        #Print Signature
+        L = len(self.range_proof.signature)
+        for i in range(0, L-1):
+            print(hex(self.range_proof.signature[i]) + ",")
+
+        print(hex(self.range_proof.signature[L-1]))
         
         
 
@@ -177,13 +202,13 @@ class PCAESMessage:
 def RangeProofTest():
     value = 48
     pow10 = 18
-    offset = 0
-    bits = 4
+    offset = 2000
+    bits = 5
     bf = getRandom()
     
-    print("Generating " + str(bits) + "-bit Range Proof for " + str(value) + "x(10**" + str(pow10) + ")+" + str(offset) + " = " + str(value*(10**pow10)+offset))
+    print("Generating a min " + str(bits) + "-bit Range Proof for " + str(value) + "x(10**" + str(pow10) + ")+" + str(offset) + " = " + str(value*(10**pow10)+offset))
     print("Blinding factor = " + hex(bf))
-    rp = PCRangeProof.Generate(45, 18, 0, 4, 100)
+    rp = PCRangeProof.Generate(value, pow10, offset, bits, getRandom())
     rp.Print()
 
     print("\nVerifing Range proof...", end="")
@@ -192,7 +217,7 @@ def RangeProofTest():
     else:
         print("Failure!")
 
-    rp.Print_Ethereum()
+    rp.Print_MEW()
 
 def AESTest():
     value = 48

@@ -184,7 +184,7 @@ contract ECMath is Debuggable {
     function HashToPoint(uint256[2] p)
         internal constant returns (uint256[2] h)
     {
-        h[0] = uint256(HashOfPoint(p)) % NCurve;
+        h[0] = uint256(HashOfPoint(p)) % PCurve;
         
         bool onCurve = false;
         while(!onCurve) {

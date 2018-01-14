@@ -74,14 +74,15 @@ def hash_to_point(p):
     hasher.update(int_to_bytes32(p[0].n))
     hasher.update(int_to_bytes32(p[1].n))
     x = bytes_to_int(hasher.digest()) % Pcurve
-    
-    while(True):
+
+    onCurve = False
+    while(not onCurve):
         y_squared = (pow(x, 3, Pcurve) + 3) % Pcurve
         y = pow(y_squared, (Pcurve+1)//4, Pcurve)
 
-        if(pow(y, 2, Pcurve) == y_squared):
-            break
-        else:
+        onCurve = (pow(y,2,Pcurve) == y_squared)
+
+        if(not(onCurve)):
             x = x + 1
 
     return (FQ(x), FQ(y))
@@ -92,24 +93,28 @@ H = hash_to_point(G1)
 #Utility Functions
 def CompressPoint(Pin):
     Pout = Pin[0].n
-    if (Pin[1].n > (Pcurve // 2)):
-        Pout = Pout | (ECSignMask)
+    if ( (Pin[1].n & 0x1) == 0x1):
+        Pout = Pout | ECSignMask
 
     return Pout
 
 def ExpandPoint(Pin):
     import math
-    y_squared = (Pin**3 + 3) % Pcurve
+    
+    x = Pin & (~ECSignMask)
+    y_squared = (pow(x,3,Pcurve) + 3) % Pcurve
     y = pow(y_squared, (Pcurve+1)//4, Pcurve)
 
-    Pout = (FQ(Pin & (~ECSignMask)), FQ(y))
-
-    if (y > (Pcurve // 2)):
-        if (Pin & ECSignMask == 0):
-            Pout = neg(Pout)
+    if ((Pin & ECSignMask) == 0):
+        if ( (y & 0x1) == 0 ):
+            Pout = (FQ(x), FQ(y))
+        else:
+            Pout = (FQ(x), FQ(Pcurve-y))
     else:
-        if (Pin & ECSignMask != 0):
-            Pout = neg(Pout)
+        if ( (y & 0x1) == 0 ):
+            Pout = (FQ(x), FQ(Pcurve-y))
+        else:
+            Pout = (FQ(x), FQ(y))
 
     return Pout
 
@@ -117,6 +122,25 @@ def getRandom():
     import random
     out = (random.getrandbits(254) % Ncurve)
     return out
+
+def ExpandCompressTest():
+    for i in range(0, 20):
+        x = getRandom()
+        point = multiply(G1, x)
+        cpoint = CompressPoint(point)
+        point2 = ExpandPoint(CompressPoint(point))
+    
+        print("Test[" + str(i) + "]...", end="")
+        if (not eq(point, point2)):
+            print("Failure! ", end="")
+
+            if ((point[1].n & 0x1) == 0x1):
+                print("point is odd")
+            
+            #print("point = " + hex(point[0].n))
+            #print("cpoint = " + hex(cpoint))
+        else:
+            print("Success!")
 
 #Ring Signature Functions
 class MSAG:

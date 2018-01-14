@@ -488,7 +488,7 @@ contract RingCTToken is MLSAG_Verify {
     //          C1'',  C2'',  ..., Cm'',
     //          C1''', C2''', ..., Cm''' }
     function CTProvePositive(uint256[2] total_commit, uint256 power10, uint256 offset, uint256[] bit_commits, uint256[] signature)
-        public constant returns (bool success)
+        public returns (bool success)
     {
         //Get number of bits to prove
         if(bit_commits.length % 2 != 0) return false;
@@ -510,8 +510,11 @@ contract RingCTToken is MLSAG_Verify {
         for (i = 1; i < bits; i++) {
             temp1 = ecAdd(temp1, [bit_commits[2*i], bit_commits[2*i+1]]);
         }
-        temp1 = ecAdd(temp1, ecMul(H, offset));
-        
+		
+		if (offset > 0) {
+			temp1 = ecAdd(temp1, ecMul(H, offset));
+        }
+		
         if ( (total_commit[0] != temp1[0]) || (total_commit[1] != temp1[1]) ) return false;
         
         //Build Public Keys for Signature Verification

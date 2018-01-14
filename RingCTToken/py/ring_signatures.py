@@ -200,8 +200,9 @@ class MSAG:
         Pout = [0]*(m*n)
         signature = [0]*(m*n+1)
 
-        #Initialize c1 hasher
+        #Initialize c1 hasher (total length of array + message hash)
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(2*m+1))
         hasher.update(msgHash)
 
         #Calulate 1st half of all rings (for c1 calculation)
@@ -307,8 +308,9 @@ class MSAG:
         Pout = [0]*(m*n)
         signature = [0]*(m*n+1)
 
-        #Initialize c1 hasher
+        #Initialize c1 hasher (total length of array + message hash)
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(2*m+1))
         hasher.update(msgHash)
 
         #Calulate 1st half of all rings (for c1 calculation)
@@ -406,8 +408,9 @@ class MSAG:
         if (n == 0): return False
         if (len(self.signature) != (m*n+1)): return False
 
-        #Start hasher for c1 calculation
+        #Initialize c1 hasher (total length of array + message hash)
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(2*m+1))
         hasher.update(self.msgHash)
 
         #Calculate Rings
@@ -512,8 +515,9 @@ class MLSAG:
         signature = [0]*(m*n+1)
         I = [0]*m
 
-        #Initialize c1 hasher
+        #Initialize c1 hasher (total length of array + message hash)
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(4*m+1))
         hasher.update(msgHash)
 
         #Calulate 1st half of all rings (for c1 calculation)
@@ -629,8 +633,9 @@ class MLSAG:
         signature = [0]*(m*n+1)
         I = [0]*m
 
-        #Initialize c1 hasher
+        #Initialize c1 hasher (total length of array + message hash)
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(4*m+1))
         hasher.update(msgHash)
 
         #Calulate 1st half of all rings (for c1 calculation)
@@ -738,8 +743,9 @@ class MLSAG:
         if (n == 0): return False
         if (len(self.signature) != (m*n+1)): return False
 
-        #Start hasher for c1 calculation
+        #Initialize c1 hasher (total length of array + message hash)
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(4*m+1))
         hasher.update(self.msgHash)
 
         #Calculate Rings

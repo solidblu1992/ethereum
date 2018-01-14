@@ -135,7 +135,7 @@ contract MLSAG_Algorithms is ECMath {
         //Construct c1 (store in c[0])
     	assembly {
     	    let p := mload(0x40)
-    	    mstore(p, mul(len, 0x20))
+    	    mstore(p, mul(add(len,1), 0x20))
     	    mstore(temp, keccak256(array, mload(p)))
     	}
     	

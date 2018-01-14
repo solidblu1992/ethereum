@@ -1,4 +1,3 @@
-
 from ring_signatures import *
 
 class PCRangeProof:
@@ -202,7 +201,7 @@ class PCAESMessage:
 def RangeProofTest():
     value = 48
     pow10 = 18
-    offset = 2000
+    offset = 0
     bits = 5
     bf = getRandom()
     

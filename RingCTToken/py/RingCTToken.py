@@ -1,6 +1,7 @@
 from ring_signatures import *
 from ct import *
 from stealth import *
+from ringct import *
 
 class RingCTToken:
     MyPrivateViewKey = 0
@@ -38,14 +39,5 @@ class RingCTToken:
     
     def __init__(self):
         self.GenerateNewStealthAddress()
-
-def RingCTTest():
-    rct = RingCTToken()
-    rct.PrintStealthAddress()
-    #rct.GenerateNewAddresses(5)
-
-    rct.PrintAddresses()
-    return rp
-
 
 

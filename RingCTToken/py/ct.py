@@ -198,13 +198,7 @@ class PCAESMessage:
         print("Encrypted Message: " + hex(bytes_to_int(self.message)))
         print("iv: " + hex(bytes_to_int(self.iv)))
 
-def RangeProofTest():
-    value = 48
-    pow10 = 18
-    offset = 10**17
-    bits = 5
-    bf = getRandom()
-    
+def RangeProofTest(value=48, pow10=18, offset=1000000,bf=getRandom()):    
     print("Generating a min " + str(bits) + "-bit Range Proof for " + str(value) + "x(10**" + str(pow10) + ")+" + str(offset) + " = " + str(value*(10**pow10)+offset))
     print("Blinding factor = " + hex(bf))
     rp = PCRangeProof.Generate(value, pow10, offset, bits, getRandom())
@@ -218,12 +212,7 @@ def RangeProofTest():
 
     rp.Print_MEW()
 
-def AESTest():
-    value = 48
-    pow10 = 18
-    offset = 0
-    bf = getRandom()
-
+def AESTest(value=48, pow10=18, offset=1000000,bf=getRandom()):
     v = value*(10**pow10)+offset
     print("Hiding " + str(v) + " and blinding factor " + hex(bf))
     shared_secret = hash_of_point(multiply(G1, getRandom()))

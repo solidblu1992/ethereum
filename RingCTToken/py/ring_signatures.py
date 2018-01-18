@@ -34,6 +34,15 @@ def int_to_bytes32(i):
 
     return x
 
+def int_to_bytes16(i):
+    x = bytes(int_to_iterable(i% 0xffffffffffffffffffffffffffffffff))
+
+    if (len(x) < 16):
+        y = bytes(16 - len(x))
+        x = y+x
+
+    return x
+
 def print_point(p):
     if (type(p) == tuple):
         s = hex(p[0].n)

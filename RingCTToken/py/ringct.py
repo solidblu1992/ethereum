@@ -121,7 +121,7 @@ class RingCT:
         hasher = sha3.keccak_256()
         for i in range(0, output_count):
             hasher.update(int_to_bytes32(output_count))
-            hasher.update(output_transactions[i].pc_encrypted_data.iv)
+            hasher.update(int_to_bytes32(bytes_to_int(output_transactions[i].pc_encrypted_data.iv)))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
@@ -213,7 +213,7 @@ class RingCT:
         hasher = sha3.keccak_256()
         for i in range(0, output_count):
             hasher.update(int_to_bytes32(output_count))
-            hasher.update(self.output_transactions[i].pc_encrypted_data.iv)
+            hasher.update(int_to_bytes32(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)))
 
         subhashes = subhashes + [hasher.digest()]
         

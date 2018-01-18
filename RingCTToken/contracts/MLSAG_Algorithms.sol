@@ -136,7 +136,7 @@ contract MLSAG_Algorithms is ECMath {
     	assembly {
     	    let p := mload(0x40)
     	    mstore(p, add(mul(len, 0x20), 0x20)) //0x20 = 32; 32 bytes for array length + 32 bytes per uint256
-    	    mstore(add(temp,0x20), keccak256(array, mload(p)))
+    	    mstore(temp, keccak256(array, mload(p)))
     	}
     	
     	out = temp[0];
@@ -152,7 +152,7 @@ contract MLSAG_Algorithms is ECMath {
     	assembly {
     	    let p := mload(0x40)
     	    mstore(p, add(mul(len, 0x20), 0x20)) //0x20 = 32; 32 bytes for array length + 32 bytes per uint256
-    	    mstore(add(temp,0x20), keccak256(array, mload(p)))
+    	    mstore(temp, keccak256(array, mload(p)))
     	}
     	
     	out = temp[0];

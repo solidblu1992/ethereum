@@ -105,6 +105,8 @@ class PCRangeProof:
         if (L % 4 != 0): return False
         L = L // 4
 
+        print("Range Proof Remix Representation - for use with CTProvePositive():")
+
         #Print Total Commitment
         commitment = self.GetTotalCommitment()
         print("[\"" + hex(commitment[0].n) + "\",\n\"" + hex(commitment[1].n) + "\"],")
@@ -119,29 +121,40 @@ class PCRangeProof:
 
         #Print Signature
         L = len(self.range_proof.signature)
-        print("", end="")
+        print("[", end="")
         for i in range(0, L-1):
             print("\"" + hex(self.range_proof.signature[i]) + "\",")
 
-        print("\"" + hex(self.range_proof.signature[L-1]) + "\"")
+        print("\"" + hex(self.range_proof.signature[L-1]) + "\"]")
 
     def Print_MEW(self):
         L = len(self.range_proof.pub_keys)
         if (L % 4 != 0): return False
         L = L // 4
 
+        print("Range Proof MEW Representation - for use with CTProvePositive():")
+
         #Print Total Commitment
         commitment = self.GetTotalCommitment()
-        print(hex(commitment[0].n) + ",\n" + hex(commitment[1].n) + "\n")
-        print(str(self.pow10) + "\n" + str(self.offset) + ",\n")
+        
+        print("total_commit:")       
+        print(hex(commitment[0].n) + ",\n" + hex(commitment[1].n))
+
+        print("\npower_10:")
+        print(str(self.pow10))
+
+        print("\noffset:")
+        print(str(self.offset))
 
         #Print Bitwise Commitments
+        print("\nbit_commits:")
         for i in range(0, L-1):
             print(hex(self.range_proof.pub_keys[i][0].n) + ",\n" + hex(self.range_proof.pub_keys[i][1].n) + ",")
 
-        print(hex(self.range_proof.pub_keys[L-1][0].n) + ",\n" + hex(self.range_proof.pub_keys[L-1][1].n) + "\n")
+        print(hex(self.range_proof.pub_keys[L-1][0].n) + ",\n" + hex(self.range_proof.pub_keys[L-1][1].n))
 
         #Print Signature
+        print("\nsignature:")
         L = len(self.range_proof.signature)
         for i in range(0, L-1):
             print(hex(self.range_proof.signature[i]) + ",")
@@ -198,7 +211,7 @@ class PCAESMessage:
         print("Encrypted Message: " + hex(bytes_to_int(self.message)))
         print("iv: " + hex(bytes_to_int(self.iv)))
 
-def RangeProofTest(value=48, pow10=18, offset=1000000,bf=getRandom()):    
+def RangeProofTest(value=48, pow10=18, bits=0, offset=1000000,bf=getRandom()):    
     print("Generating a min " + str(bits) + "-bit Range Proof for " + str(value) + "x(10**" + str(pow10) + ")+" + str(offset) + " = " + str(value*(10**pow10)+offset))
     print("Blinding factor = " + hex(bf))
     rp = PCRangeProof.Generate(value, pow10, offset, bits, getRandom())

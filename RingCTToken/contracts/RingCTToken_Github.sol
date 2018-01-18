@@ -1,6 +1,6 @@
 pragma solidity ^0.4.19;
 
-import "./MLSAG_Verify.sol";
+import {MLSAG_Verify} from "github.com/solidblu1992/ethereum/RingCTToken/contracts/MLSAG_Verify.sol";
 
 contract RingCTToken is MLSAG_Verify {
     //Storage of Token Balances

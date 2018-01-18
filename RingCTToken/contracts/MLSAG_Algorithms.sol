@@ -135,7 +135,23 @@ contract MLSAG_Algorithms is ECMath {
         //Construct c1 (store in c[0])
     	assembly {
     	    let p := mload(0x40)
-    	    mstore(p, mul(add(len,1), 0x20))
+    	    mstore(p, add(mul(len, 0x20), 0x20)) //0x20 = 32; 32 bytes for array length + 32 bytes per uint256
+    	    mstore(temp, keccak256(array, mload(p)))
+    	}
+    	
+    	out = temp[0];
+    }
+	
+	function Keccak256OfArray(uint128[] array)
+        internal pure returns (uint256 out)
+    {
+        uint256 len = array.length;
+        uint256[1] memory temp;
+        
+        //Construct c1 (store in c[0])
+    	assembly {
+    	    let p := mload(0x40)
+    	    mstore(p, add(mul(len, 0x10), 0x20)) //0x10 = 16; 32 bytes for array length + 16 bytes per uint128
     	    mstore(temp, keccak256(array, mload(p)))
     	}
     	

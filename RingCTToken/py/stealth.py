@@ -3,14 +3,16 @@ from ct import *
 class StealthTransaction:
     pub_key = 0
     dhe_point = 0
+    c_value = 0
     pc_encrypted_data = b""
     
-    def __init__(self, pub_key, dhe_point, pc_encrypted_data):
+    def __init__(self, pub_key, dhe_point, c_value, pc_encrypted_data):
         self.pub_key = pub_key
         self.dhe_point = dhe_point
         self.pc_encrypted_data = pc_encrypted_data
+        self.c_value = c_value
 
-    def GenerateStealthTx(pubViewKey, pubSpendKey, value, blinding_factor):
+    def Generate(pubViewKey, pubSpendKey, value, blinding_factor):
         r = getRandom()
         R = multiply(G1, r)
 
@@ -20,7 +22,9 @@ class StealthTransaction:
         ss2 = hash_of_point(multiply(pubSpendKey, r))
         encrypted_message = PCAESMessage.Encrypt(value, blinding_factor, ss2)
 
-        return StealthTransaction(dest_pub_key, R, encrypted_message)
+        c_value = add(multiply(H, value), multiply(G1, blinding_factor))
+
+        return StealthTransaction(dest_pub_key, R, c_value, encrypted_message)
 
     def CheckOwnership(self, privViewKey, pubSpendKey):
         ss = hash_of_point(multiply(self.dhe_point, privViewKey)) % Ncurve
@@ -45,6 +49,7 @@ class StealthTransaction:
         print("Stealth Transaction:")
         print("Public Key: " + print_point(CompressPoint(self.pub_key)))
         print("DHE Point: " + print_point(CompressPoint(self.dhe_point)))
+        print("C_Value: " + print_point(CompressPoint(self.c_value)))
         self.pc_encrypted_data.Print()
 
     def PrintScalars(self):
@@ -64,7 +69,7 @@ def StealthTxTest():
 
 
     print("\nGenerating ", end="")
-    stx = StealthTransaction.GenerateStealthTx(MyPublicViewKey, MyPublicSpendKey, 5*(10**18), getRandom())
+    stx = StealthTransaction.Generate(MyPublicViewKey, MyPublicSpendKey, 5*(10**18), getRandom())
     stx.Print()
 
     print("\nChecking Ownership...", end="")

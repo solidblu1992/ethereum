@@ -1,8 +1,9 @@
 pragma solidity ^0.4.19;
 
-import "./MLSAG_Verify.sol";
+import {MLSAG_Verify} from "github.com/solidblu1992/ethereum/RingCTToken/contracts/MLSAG_Verify.sol";
+import {StealthTransaction} from "github.com/solidblu1992/ethereum/RingCTToken/contracts/StealthTransaction.sol";
 
-contract RingCTToken is MLSAG_Verify {
+contract RingCTToken is MLSAG_Verify, StealthTransaction {
     //Storage of Token Balances
 	uint256 public totalSupply;
 	
@@ -12,13 +13,6 @@ contract RingCTToken is MLSAG_Verify {
 	//Mapping of uint256 index (0...pub_key_count-1) to known public keys (for finding mix in keys)
 	mapping (uint256 => uint256) public pub_keys_by_index;
 	uint256 public pub_key_count;
-	
-	//Stealth Address Mappings
-	mapping (address => uint256) public stx_pubviewkeys;    //Stores A=aG (public view key)
-    mapping (address => uint256) public stx_pubspendkeys;   //Stores B=bG (public spend key)
-    mapping (uint256 => uint256) public stx_dhe_points;     //Stores R=rG for each stealth transaction
-    mapping (uint256 => bool) public stx_dhepoints_reverse; //Reverse lookup for dhe_points
-	uint256 public stx_dhe_point_count;
     
 	//Storage array of commitments which have been proven to be positive
 	mapping (uint256 => bool) public balance_positive;
@@ -28,82 +22,6 @@ contract RingCTToken is MLSAG_Verify {
     
     function RingCTToken() public {
         //Constructor Code
-    }
-    
-    //Stealth Address Functions
-    //For a given msg.sender (ETH address) publish EC points for public spend and view keys
-    //These EC points will be used to generate stealth addresses
-    function PublishSTxPublicKeys(uint256 stx_pubspendkey, uint256 stx_pubviewkey)
-        public returns (bool success)
-    {
-        stx_pubspendkeys[msg.sender] = stx_pubspendkey;
-        stx_pubviewkeys[msg.sender] = stx_pubviewkey;
-        success = true;
-    }
-    
-    //Generate stealth transaction (off-chain)
-    function GenerateStealthTx(address stealth_address, uint256 random)
-        public constant returns (address dest, uint256 dhe_point)
-    {
-        //Verify that destination address has published spend and view keys
-        if (stx_pubspendkeys[stealth_address] == 0 || stx_pubviewkeys[stealth_address] == 0) return (0,0);
-        
-        //Generate DHE Point (R = rG)
-        uint256[2] memory temp;
-        
-        temp = ecMul(G1, random);
-        dhe_point = CompressPoint(temp);
-        
-        //Generate shared secret ss = H(rA) = H(arG)
-        temp[0] = HashOfPoint(ecMul(ExpandPoint(stx_pubviewkeys[stealth_address]), random));
-        
-        //Calculate target address public key P = ss*G + B
-        temp = ecMul(G1, temp[0]);
-        temp = ecAdd(temp, ExpandPoint(stx_pubspendkeys[stealth_address]));
-        
-        //Calculate target address from public key
-        dest = GetAddress(temp);
-    }
-    
-    //Calulates Stealth Address from index i of stx_dhepoints (off-chain)
-    //This function can be used to check for non-zero value addresses (are they applicable?)
-    function GetStealthTxAddress(uint256 i, uint256 stx_privviewkey, uint256 stx_pubspendkey)
-        public constant returns (address dest)
-    {
-        //If i >= stx_dhepoint_count then automatically the address is not used
-        if (i >= stx_dhe_point_count) return 0;
-        
-        //Expand dhe point (R = rG)
-        uint256[2] memory temp;
-        temp = ExpandPoint(stx_dhe_points[i]);
-        
-        //Calculate shared secret ss = H(aR) = H(arG)
-        temp[0] = HashOfPoint(ecMul(temp, stx_privviewkey));
-        
-        //Calculate target address public key P = ss*G + B
-        temp = ecMul(G1, temp[0]);
-        temp = ecAdd(temp, ExpandPoint(stx_pubspendkey));
-        
-        //Calculate target address from public key
-        dest = GetAddress(temp);
-    }
-    
-    //Calculates private key for stealth tx
-    function GetStealthTxPrivKey(uint256 i,uint256 stx_privviewkey, uint256 stx_privspendkey)
-        public constant returns (uint256 privkey)
-    {
-        //If i >= stx_dhepoint_count then automatically the address is not used
-        if (i >= stx_dhe_point_count) return 0;
-        
-        //Expand dhe point (R = rG)
-        uint256[2] memory temp;
-        temp = ExpandPoint(stx_dhe_points[i]);
-        
-        //Calculate shared secret ss = H(aR) = H(arG)
-        temp[0] = HashOfPoint(ecMul(temp, stx_privviewkey));
-        
-        //Calculate private key = ss + b
-        privkey = addmod(temp[0], stx_privspendkey, NCurve);
     }
     
     //Transaction Functions
@@ -602,42 +520,6 @@ contract RingCTToken is MLSAG_Verify {
 			for (j = 0; j < newWidth; j++) {
 				//Copy over New Array
 				outArray[outWidth*i + baseWidth + j] = newColumns[newWidth*i + j];
-			}
-		}
-	}
-	
-	//DropRightColumnsFromArray
-	//Drops some number columns from the right side of an array
-	//e.g.
-	//baseArray =	{	a, b, c, d, 1, 2,
-	//					e, f, g, h, 3, 4,
-	//					i, j, k, m, 5, 6	}
-	//baseWidth = 6 (# of columns)
-	//colToDrop = 2
-	//-----------------------------
-	//outArray =	{	a, b, c, d,
-	//					e, f, g, h,
-	//					i, j, k, m	}
-	function DropRightColumnsFromArray(uint256[] baseArray, uint256 baseWidth, uint256 colToDrop)
-		public pure returns (uint256[] outArray)
-	{
-		//Check Array Dimensions
-		if (baseArray.length % baseWidth != 0) return;
-		if (colToDrop > baseWidth) return;
-		
-		uint256 n = baseArray.length / baseWidth;
-		
-		//Create Output Array
-		outArray = new uint256[](baseArray.length - n*colToDrop);
-		uint256 outWidth = baseWidth - colToDrop;
-		
-		//Assemble new array
-		uint256 i;
-		uint256 j;
-		for (i = 0; i < n; i++) {
-			for (j = 0; j < outWidth; j++) {
-				//Copy only relevant elements over
-				outArray[outWidth*i + j] = baseArray[baseWidth*i + j];
 			}
 		}
 	}

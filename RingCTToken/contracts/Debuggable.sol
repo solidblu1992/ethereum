@@ -13,4 +13,8 @@ contract Debuggable {
 
     	selfdestruct(msg.sender);
 	}
+	
+	event DebugEvent(
+		uint256[10] data;
+	);
 }

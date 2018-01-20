@@ -65,7 +65,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     	//encrypted_data_iv[dest_pub_key] = 0;
     	
     	//Log new stealth transaction
-    	NewStealthTx(dest_pub_key, dhe_point, [msg.value, 0]);
+    	NewStealthTx(dest_pub_key, dhe_point, [msg.value, 0, 0]);
     	
     	//Update global token supply
     	totalSupply += msg.value;
@@ -117,7 +117,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 			//encrypted_data_iv[dest_pub_keys[i]] = 0;
     	
     	    //Log new stealth transaction
-        	NewStealthTx(dest_pub_keys[i], dhe_points[i], [values[i], 0]);
+        	NewStealthTx(dest_pub_keys[i], dhe_points[i], [values[i], 0, 0]);
     	}
     	
     	//Update global token supply

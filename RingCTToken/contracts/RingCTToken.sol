@@ -10,6 +10,16 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//Mapping of EC Public Key to Pedersen Commitment of Value
 	mapping (uint256 => uint256) public token_committed_balance;
 	
+	event Withdrawal(
+	    address _to,
+	    uint256 _value
+	);
+	
+	//Mapping of EC Public Key to encrypted data (e.g. value and blinding factor)
+	mapping (uint256 => uint256) public encrypted_data0;
+	mapping (uint256 => uint256) public encrypted_data1;
+	mapping (uint256 => uint256) public encrypted_data2;
+	
 	//Mapping of uint256 index (0...pub_key_count-1) to known public keys (for finding mix in keys)
 	mapping (uint256 => uint256) public pub_keys_by_index;
 	uint256 public pub_key_count;
@@ -40,20 +50,31 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     	token_committed_balance[dest_pub_key] = CompressPoint(ecMul(H, msg.value));
     	pub_keys_by_index[pub_key_count] = dest_pub_key;
     	pub_key_count++;
+    
+    	//Store DHE point if not already in dhe point set
+    	if (!stx_dhepoints_reverse[dhe_point]) {
+        	stx_dhe_points[stx_dhe_point_count] = dhe_point;
+        	stx_dhepoints_reverse[dhe_point] = true;
+        	stx_dhe_point_count++;
+    	}
     	
-    	//Store DHE point 
-    	stx_dhe_points[stx_dhe_point_count] = dhe_point;
-    	stx_dhepoints_reverse[dhe_point] = true;
-    	stx_dhe_point_count++;
+    	        	
+    	//Store non-encrypted value (bf and iv = 0)
+    	encrypted_data0[dest_pub_key] = msg.value;
+    	//encrypted_data1[dest_pub_key] = 0;
+    	//encrypted_data_iv[dest_pub_key] = 0;
+    	
+    	//Log new stealth transaction
+    	NewStealthTx(dest_pub_key, dhe_point, [msg.value, 0]);
     	
     	//Update global token supply
     	totalSupply += msg.value;
 	}
 	
-	//Deposit Ether as CT tokens to the specified ETH address
-	//this function allows multiple deposits at onces
+	//Deposit Ether as CT tokens to the specified alt_bn_128 public keys
+	//This function allows multiple deposits at onces
 	//NOTE: this deposited amount will NOT be confidential, initial blinding factor = 0
-	function Deposit(uint256[] dest_pub_keys, uint256[] values)
+	function Deposit(uint256[] dest_pub_keys, uint256[] dhe_points, uint256[] values)
 	    payable public
     {
         //Incoming Value must be non-zero
@@ -79,6 +100,24 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     	for (i = 0; i < dest_pub_keys.length; i++) {
         	//Generate pedersen commitment and add to existing balance
         	token_committed_balance[dest_pub_keys[i]] = CompressPoint(ecMul(H, values[i]));
+        	pub_keys_by_index[pub_key_count] = dest_pub_keys[i];
+        	pub_key_count++;
+        
+        	//Store DHE point if not already in dhe point set
+        	if (!stx_dhepoints_reverse[dhe_points[i]]) {
+            	//Store DHE point 
+            	stx_dhe_points[stx_dhe_point_count] = dhe_points[i];
+            	stx_dhepoints_reverse[dhe_points[i]] = true;
+            	stx_dhe_point_count++;
+        	}
+        	
+        	//Store non-encrypted value (bf and iv = 0)
+			encrypted_data0[dest_pub_keys[i]] = values[i];
+			//encrypted_data1[dest_pub_keys[i]] = 0;
+			//encrypted_data_iv[dest_pub_keys[i]] = 0;
+    	
+    	    //Log new stealth transaction
+        	NewStealthTx(dest_pub_keys[i], dhe_points[i], [values[i], 0]);
     	}
     	
     	//Update global token supply
@@ -93,6 +132,8 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//dest_pub_keys		= set of expanded EC points representing new UTXO public keys
 	//values			= set of pedersen commitments (expanded EC points) representing the new values (masked) for the above UTXO's
 	//dest_dhe_points	= set of DHE points to be used by the receivers to calculate the new UTXO public keys with their stealth addresses
+	//encrypted_data    = uint256[3] for each output representing encrypted data which can be included.  The contract will not check this data,
+	//                    but this can be an easy way to pass on the value and blinding factor of the new commitment to the receiver.
 	//I					= key images for the MLSAG	{ I1x, I1y, I2x, I2y, ..., I(m+1)x, I(m+1)y }
 	//input_pub_keys	= public key set for the MLSAG, each point is expanded	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my,
 	//																				P21x, P21y, P22x, P22y, ..., P2mx, P2my,
@@ -108,7 +149,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//		  The actual MLSAG signs an array of n*(m+1) points as the last column is a summation of each public key in the vector
 	//		  as well as each input commitment in the vector and the summation of all output commitments (sigma(Pj) + sigma(Cinj) - sigma(Couti))
 	//Note 2: See https://eprint.iacr.org/2015/1098 for more details on RingCT
-    function Send(  uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data, uint128[] iv,
+    function Send(  uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
                     uint256[] I, uint256[] input_pub_keys, uint256[] signature)
         public returns (bool success)
     {
@@ -119,8 +160,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
         //Need same number of values and dhe points
         if (values.length != dest_pub_keys.length) return false;
         if (dest_dhe_points.length != dest_pub_keys.length) return false;
-		if (encrypted_data.length != dest_pub_keys.length*2) return false;
-		if (iv.length != dest_pub_keys.length) return false;
+		if (encrypted_data.length != dest_pub_keys.length*3) return false;
         
         //Check other array lengths
         if (I.length % 2 != 0) return false;
@@ -203,7 +243,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 		P = AddColumnsToArray(input_pub_keys, v.m, P, 2);
         
         //Verify ring signature (MLSAG)
-        if (!VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data, iv), I, P, signature)) return false;
+        if (!VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature)) return false;
     
         //Store key images (point of no return, all returns need to be reverts after this point)
         for (v.i = 0; v.i < (I.length / 2); v.i++) {
@@ -232,9 +272,15 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     			stx_dhe_points[stx_dhe_point_count] = v.point3[0];			//Store DHE point (for calculating stealth address)
     			stx_dhepoints_reverse[v.point3[0]] = true;
     			stx_dhe_point_count++;
-    			
-    			stx_dhepoints_reverse[v.point3[0]] = true;
 			}
+			
+			//Store encrypted data and iv
+			encrypted_data0[v.point1[0]] = encrypted_data[3*v.i];
+			encrypted_data1[v.point1[0]] = encrypted_data[3*v.i+1];
+			encrypted_data2[v.point1[0]] = encrypted_data[3*v.i+2];
+			
+			//Log new stealth transaction
+			NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
 		}
 		
 		return true;
@@ -254,7 +300,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//Note: Every withdrawal must create at least one new masked UTXO, otherwise the privacy of all spent input public keys are compromised.
 	//		(The network will know which key vector has been spent.)  At a minimum, one new UTXO may be created with a commitment to zero.
     function Withdraw(  address redeem_eth_address, uint256 redeem_value, uint256 redeem_blinding_factor,
-						uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points,
+						uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
 						uint256[] I, uint256[] input_pub_keys, uint256[] signature)
         public returns (bool success)
     {
@@ -265,6 +311,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
         //Need same number of values and dhe points
         if (values.length != dest_pub_keys.length) return false;
         if (dest_dhe_points.length != dest_pub_keys.length) return false;
+        if (encrypted_data.length != dest_pub_keys.length*3) return false;
         
         //Check other array lengths
         if (I.length % 2 != 0) return false;
@@ -380,13 +427,22 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     			stx_dhe_points[stx_dhe_point_count] = v.point3[0];			//Store DHE point (for calculating stealth address)
     			stx_dhepoints_reverse[v.point3[0]] = true;
     			stx_dhe_point_count++;
-    			
-    			stx_dhepoints_reverse[v.point3[0]] = true;
 			}
+			
+		   //Store encrypted data and iv
+			encrypted_data0[v.point1[0]] = encrypted_data[3*v.i];
+			encrypted_data1[v.point1[0]] = encrypted_data[3*v.i+1];
+			encrypted_data2[v.point1[0]] = encrypted_data[3*v.i+2];
+			
+			//Log new stealth transaction
+			NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
 		}
 		
 		//Send redeemed value
 		redeem_eth_address.transfer(redeem_value);
+		
+		//Log Withdrawal
+		Withdrawal(redeem_eth_address, redeem_value);
 		
 		return true;
     }
@@ -467,10 +523,10 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     }
     
     //Utility Functions
-    function HashSendMsg(uint256[] dest_pub_keys, uint256[] output_commitments, uint256[] dest_dhe_points, uint256[] encrypted_data, uint128[] iv)
+    function HashSendMsg(uint256[] dest_pub_keys, uint256[] output_commitments, uint256[] dest_dhe_points, uint256[] encrypted_data)
         public pure returns (bytes32 msgHash)
     {
-        msgHash = keccak256(Keccak256OfArray(dest_pub_keys), Keccak256OfArray(output_commitments), Keccak256OfArray(dest_dhe_points), Keccak256OfArray(encrypted_data),Keccak256OfArray(iv),);
+        msgHash = keccak256(Keccak256OfArray(dest_pub_keys), Keccak256OfArray(output_commitments), Keccak256OfArray(dest_dhe_points), Keccak256OfArray(encrypted_data));
     }
 	
 	function HashWithdrawMsg(	address ethAddress, uint256 value, uint256 bf,

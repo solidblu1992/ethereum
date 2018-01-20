@@ -17,8 +17,7 @@ contract StealthTransaction is ECMath {
 	event NewStealthTx (
 	    uint256 pub_key,
 	    uint256 dhe_point,
-	    uint256[2] encrypted_data,
-	    uint256 iv
+	    uint256[3] encrypted_data
 	);
 	
 	//Stealth Address Functions

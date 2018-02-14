@@ -12,8 +12,7 @@ class StealthTransaction:
         self.pc_encrypted_data = pc_encrypted_data
         self.c_value = c_value
 
-    def Generate(pubViewKey, pubSpendKey, value, blinding_factor):
-        r = getRandom()
+    def Generate(pubViewKey, pubSpendKey, value, blinding_factor, r):
         R = multiply(G1, r)
 
         ss1 = hash_of_point(multiply(pubViewKey, r)) % Ncurve
@@ -25,6 +24,11 @@ class StealthTransaction:
         c_value = add(multiply(H, value), multiply(G1, blinding_factor))
 
         return StealthTransaction(dest_pub_key, R, c_value, encrypted_message)
+
+
+    def Generate_GenRandom(pubViewKey, pubSpendKey, value, blinding_factor):
+        r = getRandom()
+        return Generate(pubViewKey, pubSpendKey, value, blinding_factor, r)
 
     def CheckOwnership(self, privViewKey, pubSpendKey):
         ss = hash_of_point(multiply(self.dhe_point, privViewKey)) % Ncurve

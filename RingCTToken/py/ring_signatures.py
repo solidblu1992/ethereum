@@ -129,7 +129,16 @@ def ExpandPoint(Pin):
 
 def getRandom():
     import random
+    out = (random.SystemRandom().getrandbits(254) % Ncurve)
+    return out
+
+def getRandomUnsafe(seed=None):
+    import random
+    if (seed != None):
+        random.seed(seed)
+        
     out = (random.getrandbits(254) % Ncurve)
+
     return out
 
 def ExpandCompressTest():

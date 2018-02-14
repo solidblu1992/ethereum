@@ -475,6 +475,106 @@ def RingCTTest(mixins = 2, inputs = 2, outputs = 2):
     rct = RingCT.Sign(xk, xk_v, xk_bf, mixin_tx, out_tx, v_out, bf_out) 
     return rct
 
-x = RingCTTest()
-x.Print_MEW()
+#x = RingCTTest()
+#x.Print_MEW()
 
+def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0):
+    import random
+    print("Running RingCT Test (Repeatable)")
+    print("input_count = 2")
+    print("mixin_count = 2")
+    print("ring_size = " + str(input_count+1) + " x " + str(mixin_count+1))
+    print("================================")
+
+    #Store View and Spend Keys
+    pri_viewkey  = 0x26748d27140087af35b5523fbf4063a48e10277b7bb67379eae64b1e9bcdd49c
+    pri_spendkey = 0x0657e10b4ecf56e94546357f35447ec39f6fee66c44c013aa55b54fcd6e4c340
+    pub_viewkey  = multiply(G1, pri_viewkey)
+    pub_spendkey = multiply(G1, pri_spendkey)
+
+    #Pre-fetch random values for repeatable results
+    r_index = 0
+    r = []
+    random.seed(seed)
+    for i in range(0, 100):
+        r = r + [getRandomUnsafe()]
+
+    #Store Committed Values (each 0.01 ETH)
+    xk_v = [1 * (10**16)] * (input_count*(mixin_count+1))
+    xk_v_total = (1 * (10**16)) * (input_count)
+    xk_bf = [0] * (input_count*(mixin_count+1))
+    #x_bf = [0xeffb51abab008722828f38ca6f86752a8772a395597d97d80713cf744f458c9,
+    #        0x5268d4fc49b5c5d3e0cd522d21d18fc0f4299e5cf435465930b9bbabde4f076,
+    #        0x1ac4ddfbe21f223d42119dcac849ffa9853e2bc1cc8bc3b4199a763b25f43272]
+
+    #Store Owned Input Wallets (Both owned and mixin)
+    stealth_tx = []
+    for i in range (0, len(xk_v)):
+        stealth_tx = stealth_tx + [StealthTransaction.Generate(pub_viewkey, pub_spendkey, xk_v[i], xk_bf[i], r[r_index])]
+        r_index = r_index + 1
+
+    #Prompt Deposits
+    print("Create Deposits:")
+    for i in range(0, len(stealth_tx)):
+        if (i < input_count):
+            print("Input TX " + str(i) + ":\t[priv key: " + hex(stealth_tx[i].GetPrivKey(pri_viewkey, pri_spendkey)) + "]")
+        else:
+            print("Mixin TX " + str(i - input_count) + ":")
+            
+        print("Pub Key:\t" + print_point(CompressPoint(stealth_tx[i].pub_key)))
+        print("DHE Point:\t" + print_point(CompressPoint(stealth_tx[i].dhe_point)))
+        print("Value:\t\t" + str(xk_v[i] / (10**18)) + " ETH (" + str(xk_v[i]) + " wei)")
+        print("BF:\t\t" + hex(xk_bf[i]))
+
+
+
+        print()
+
+    print("================================")
+
+    #Create Output Addresses (sent to self via stealth address)
+    stealth_tx_out = []
+    bf_total = 0
+    for i in range(0, outputs):
+        if (i < (outputs-1)):
+            v = xk_v_total // outputs
+            bf = r[r_index]
+            rand = r[r_index+1]
+            r_index = r_index + 2
+            
+        else:
+            v = (xk_v_total - (xk_v_total // outputs)*i)
+            bf = (Ncurve-bf_total)
+            rand = r[r_index]
+            r_index = r_index + 1
+            
+        stealth_tx_out = stealth_tx_out + [StealthTransaction.Generate(pub_viewkey, pub_spendkey, v, bf, rand)]
+        bf_total = (bf_total + bf) % Ncurve
+            
+        print("Output TX " + str(i) + ":")
+        print("Pub Key:\t" + print_point(CompressPoint(stealth_tx_out[i].pub_key)))
+        print("DHE Point:\t" + print_point(CompressPoint(stealth_tx_out[i].dhe_point)))
+        print("Value:\t\t" + str(v / 10**18) + " ETH (" + str(v) + " wei)")
+        print("BF:\t\t" + hex(bf))
+        print()
+
+    return stealth_tx_out
+
+    #Store Mix In Transactions
+    mixin_pubkeys = [multiply(G1, 0x108f37cb589b958b5c812da30f45de4cc5c9356f36a74c5827095b69f221beec),
+                     multiply(G1, 0x1611eba0d164b81c6c5ad7dd071ad53ffe0e51438562f5e506d3a687d89f6abe),
+                     multiply(G1, 0x141cb57b4f91bca66235ea114d8a79b9c52467cf416d9d71bb7d6c80844b89ff),
+                     multiply(G1, 0x26a154b100b76a073aa9b94daccfc0d7a80e03934e2ce299c4234c30bb34fcc1)]
+
+    mixin_cvalues = [multiply(G1, 0x0197f9643ab4fb7d6ce0ba1adf0f5a562c5a7f0bab01d6b5f09dfadc87fcc058),
+                     multiply(G1, 0x1ae9a33e99ab07047c28086f2117fc461ed77aa467eead3ebe7b5689c046dd01),
+                     multiply(G1, 0x0c11d1965f2b21332422d8f3f5f2ad20f51cea1c838bc9d710fdd849cb09e945),
+                     multiply(G1, 0x01b5b4ebe7c6f5fcfe2928779e2a68d82309419c62fde433798c968e17f5d279)]
+
+    mixin_tx = []
+    for i in range(0, len(mixin_pubkeys)):
+        mixin_tx = mixin_tx + [StealthTransaction(mixin_pubkeys[i], G1, mixin_cvalues[i], b"")] #dhe_point and encrypted data are not used (args 2 and 4)
+
+    return stealth_tx
+    
+tx = RingCTTest_Repeatable()

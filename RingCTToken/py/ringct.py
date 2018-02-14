@@ -502,7 +502,10 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
     #Store Committed Values (each 0.01 ETH)
     xk_v = [1 * (10**16)] * (input_count*(mixin_count+1))
     xk_v_total = (1 * (10**16)) * (input_count)
-    xk_bf = [0] * (input_count*(mixin_count+1))
+	
+	#for i in range(0, len(xk_v)):
+	#	xk_bf = xk_bf + [r[r_index]]
+	#	r_index = r_index + 1
 
     #Store Owned Input Wallets (Both owned and mixin)
     stealth_tx = []

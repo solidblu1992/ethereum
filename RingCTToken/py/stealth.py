@@ -28,7 +28,7 @@ class StealthTransaction:
 
     def Generate_GenRandom(pubViewKey, pubSpendKey, value, blinding_factor):
         r = getRandom()
-        return Generate(pubViewKey, pubSpendKey, value, blinding_factor, r)
+        return StealthTransaction.Generate(pubViewKey, pubSpendKey, value, blinding_factor, r)
 
     def CheckOwnership(self, privViewKey, pubSpendKey):
         ss = hash_of_point(multiply(self.dhe_point, privViewKey)) % Ncurve

@@ -43,6 +43,9 @@ def int_to_bytes16(i):
 
     return x
 
+def to_point(x, y):
+    return (FQ(x), FQ(y))
+
 def print_point(p):
     if (type(p) == tuple):
         s = hex(p[0].n)

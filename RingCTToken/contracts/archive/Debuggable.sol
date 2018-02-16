@@ -15,6 +15,6 @@ contract Debuggable {
 	}
 	
 	event DebugEvent(
-		uint256[10] data;
+		uint256[10] data
 	);
 }

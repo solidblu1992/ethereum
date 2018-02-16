@@ -91,40 +91,36 @@ class RingCT:
         #Start building signature massage over output public keys, committed values, dhe points, and encrypted messages (both message and iv)
         hasher = sha3.keccak_256()
         subhashes = []
-        for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
+        hasher.update(int_to_bytes32(output_count*2))
+        for i in range(0, output_count):    
             hasher.update(int_to_bytes32(output_transactions[i].pub_key[0].n))
             hasher.update(int_to_bytes32(output_transactions[i].pub_key[1].n))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(output_count*2))
         for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])),output_transactions[i].c_value)) 
             hasher.update(int_to_bytes32(output_transactions[i].c_value[0].n))
             hasher.update(int_to_bytes32(output_transactions[i].c_value[1].n))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(output_count*2))
         for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             hasher.update(int_to_bytes32(output_transactions[i].dhe_point[0].n))
             hasher.update(int_to_bytes32(output_transactions[i].dhe_point[1].n))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(output_count*3))
         for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             hasher.update(output_transactions[i].pc_encrypted_data.message)
-
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             hasher.update(int_to_bytes32(bytes_to_int(output_transactions[i].pc_encrypted_data.iv)))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(len(subhashes)))
         for i in range(0, len(subhashes)):
             hasher.update(subhashes[i])
 
@@ -208,11 +204,6 @@ class RingCT:
         for i in range(0, output_count):
             hasher.update(int_to_bytes32(output_count))
             hasher.update(self.output_transactions[i].pc_encrypted_data.message)
-
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             hasher.update(int_to_bytes32(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)))
 
         subhashes = subhashes + [hasher.digest()]
@@ -283,20 +274,11 @@ class RingCT:
             else:
                 print("],")
 
-        #Print encrypted data
+        #Print encrypted data + iv
         print("[", end="")
         for i in range(0, output_count):
             print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + "\",")
-            print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + "\"", end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-            else:
-                print("],")
-
-        #Print encrypted data iv
-        print("[", end="")
-        for i in range(0, output_count):
+            print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + "\",")
             print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)) + "\"", end = "")
 
             if (i < (output_count-1)):
@@ -371,14 +353,7 @@ class RingCT:
         print("\n\nencrypted_data:")
         for i in range(0, output_count):
             print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + ",")
-            print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])), end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-
-        #Print encrypted data iv
-        print("\n\niv:")
-        for i in range(0, output_count):
+            print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + ",")
             print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)), end = "")
 
             if (i < (output_count-1)):
@@ -469,14 +444,11 @@ def RingCTTest(mixins = 2, inputs = 2, outputs = 2):
         bf_out = bf_out + [getRandom()]
         c_out = c_out + [add(multiply(G1, bf_out[i]), multiply(H, v_out[i]))]
 
-        out_tx = out_tx + [StealthTransaction.Generate(multiply(G1, getRandom()), multiply(G1, getRandom()), v_out[i], bf_out[i])]
+        out_tx = out_tx + [StealthTransaction.Generate_GenRandom(multiply(G1, getRandom()), multiply(G1, getRandom()), v_out[i], bf_out[i])]
 
     #Generate Ring CT Token Instance    
     rct = RingCT.Sign(xk, xk_v, xk_bf, mixin_tx, out_tx, v_out, bf_out) 
     return rct
-
-#x = RingCTTest()
-#x.Print_MEW()
 
 def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0):
     import random
@@ -502,18 +474,20 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
     #Store Committed Values (each 0.01 ETH)
     xk_v = [1 * (10**16)] * (input_count*(mixin_count+1))
     xk_v_total = (1 * (10**16)) * (input_count)
-	
-	#for i in range(0, len(xk_v)):
-	#	xk_bf = xk_bf + [r[r_index]]
-	#	r_index = r_index + 1
+    xk_bf = [0] * len(xk_v)
+    
+    #for i in range(0, len(xk_v)):
+    #	xk_bf = xk_bf + [r[r_index]]
+    #	r_index = r_index + 1
 
     #Store Owned Input Wallets (Both owned and mixin)
     stealth_tx = []
+    
     for i in range (0, len(xk_v)):
         stealth_tx = stealth_tx + [StealthTransaction.Generate(pub_viewkey, pub_spendkey, xk_v[i], xk_bf[i], r[r_index])]
         r_index = r_index + 1
 
-    #Prompt Deposits
+    #Create Deposits (Both for input TX and mixin TX)
     print("Create Deposits:")
     for i in range(0, len(stealth_tx)):
         if (i < input_count):
@@ -533,8 +507,15 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
     print("================================")
 
     #Create Output Addresses (sent to self via stealth address)
+    import math
     stealth_tx_out = []
+    stealth_tx_out_v = []
+    stealth_tx_out_bf = []
+    rp_out = []
     bf_total = 0
+    bf_target = r[r_index]
+    r_index = r_index+1
+    
     for i in range(0, outputs):
         if (i < (outputs-1)):
             v = xk_v_total // outputs
@@ -544,11 +525,13 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
             
         else:
             v = (xk_v_total - (xk_v_total // outputs)*i)
-            bf = (Ncurve-bf_total)
+            bf = (Ncurve-bf_target-bf_total) % Ncurve
             rand = r[r_index]
             r_index = r_index + 1
             
         stealth_tx_out = stealth_tx_out + [StealthTransaction.Generate(pub_viewkey, pub_spendkey, v, bf, rand)]
+        stealth_tx_out_v = stealth_tx_out_v + [v]
+        stealth_tx_out_bf = stealth_tx_out_bf + [bf]
         bf_total = (bf_total + bf) % Ncurve
             
         print("Output TX " + str(i) + ":")
@@ -558,23 +541,61 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
         print("BF:\t\t" + hex(bf))
         print()
 
-    return stealth_tx_out
+        #Create Pedersen Commitments
+        pow10 = math.floor(math.log(v,10))
+        val = v // 10**pow10
+        rem = v - ( (val) * (10**pow10))
+        bits = math.floor(math.log(val,4))+1
+        
+        #print("v: " + str(val) + ", pow10: " + str(pow10) + ", rem: " + str(rem))
+        rp_out = rp_out + [PCRangeProof.Generate(val, pow10, rem, 2, bf)]
+        
+    #Retreive Private Keys for Input Transactions
+    rct_xk = []
+    for i in range(0, input_count):
+        rct_xk = rct_xk + [stealth_tx[i].GetPrivKey(pri_viewkey, pri_spendkey)]
 
-    #Store Mix In Transactions
-    mixin_pubkeys = [multiply(G1, 0x108f37cb589b958b5c812da30f45de4cc5c9356f36a74c5827095b69f221beec),
-                     multiply(G1, 0x1611eba0d164b81c6c5ad7dd071ad53ffe0e51438562f5e506d3a687d89f6abe),
-                     multiply(G1, 0x141cb57b4f91bca66235ea114d8a79b9c52467cf416d9d71bb7d6c80844b89ff),
-                     multiply(G1, 0x26a154b100b76a073aa9b94daccfc0d7a80e03934e2ce299c4234c30bb34fcc1)]
+    rct_xk_v = xk_v[:input_count]
+    rct_xk_bf = xk_bf[:input_count]
+    rct_mixin_tx = stealth_tx[input_count:]
 
-    mixin_cvalues = [multiply(G1, 0x0197f9643ab4fb7d6ce0ba1adf0f5a562c5a7f0bab01d6b5f09dfadc87fcc058),
-                     multiply(G1, 0x1ae9a33e99ab07047c28086f2117fc461ed77aa467eead3ebe7b5689c046dd01),
-                     multiply(G1, 0x0c11d1965f2b21332422d8f3f5f2ad20f51cea1c838bc9d710fdd849cb09e945),
-                     multiply(G1, 0x01b5b4ebe7c6f5fcfe2928779e2a68d82309419c62fde433798c968e17f5d279)]
+    #Print Input data for MyEtherWallet
+    print("================================")
+    print("Create Deposits (MEW):")
+    print("value = " + str(xk_v_total))
+    print("dest_pub_keys:")
+    for i in range(0, len(stealth_tx)):
+        if i > 0:
+            print(",")
+        print(print_point(CompressPoint(stealth_tx[i].pub_key)),end="")
+    print("\n")
 
-    mixin_tx = []
-    for i in range(0, len(mixin_pubkeys)):
-        mixin_tx = mixin_tx + [StealthTransaction(mixin_pubkeys[i], G1, mixin_cvalues[i], b"")] #dhe_point and encrypted data are not used (args 2 and 4)
+    print("dhe_points:")
+    for i in range(0, len(stealth_tx)):
+        if i > 0:
+            print(",")
+        print(print_point(CompressPoint(stealth_tx[i].dhe_point)),end="")
+    print("\n")
 
-    return stealth_tx
-    
+    print("values:")
+    for i in range(0, len(stealth_tx)):
+        if i > 0:
+            print(",")
+        print(str(xk_v[i]),end="")
+    print("\n")
+
+    print("================================")
+    print("Prove Ranges (MEW):")
+    for i in range(0, len(rp_out)):
+        rp_out[i].Print_MEW()
+        print()
+
+    print("================================")
+    print("RingCT Send (MEW):")
+    rct = RingCT.Sign(rct_xk, rct_xk_v, rct_xk_bf, rct_mixin_tx, stealth_tx_out, stealth_tx_out_v, stealth_tx_out_bf)
+    rct.Print_MEW()
+    return rct
+
+#tx = RingCTTest()
+#tx.Print_MEW()    
 tx = RingCTTest_Repeatable()

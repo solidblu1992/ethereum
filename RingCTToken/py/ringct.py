@@ -120,11 +120,12 @@ class RingCT:
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(len(subhashes)))
         for i in range(0, len(subhashes)):
+            print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
             hasher.update(subhashes[i])
 
-        msgHash = hasher.digest() 
+        msgHash = hasher.digest()
+        print("TotalHash: " + hex(bytes_to_int(msgHash)))
         neg_total_out_commitment = neg(add(multiply(H, in_value), multiply(G1, total_out_bf)))
     
         #Sum up last column
@@ -180,36 +181,37 @@ class RingCT:
         #Verify hash of output transactions: public keys, committed values, dhe_points, and encrypted data (message and iv)
         hasher = sha3.keccak_256()
         subhashes = []
-        for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
+        hasher.update(int_to_bytes32(output_count*2))
+        for i in range(0, output_count):    
             hasher.update(int_to_bytes32(self.output_transactions[i].pub_key[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].pub_key[1].n))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(output_count*2))
         for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
+            assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])),self.output_transactions[i].c_value)) 
             hasher.update(int_to_bytes32(self.output_transactions[i].c_value[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].c_value[1].n))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(output_count*2))
         for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             hasher.update(int_to_bytes32(self.output_transactions[i].dhe_point[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].dhe_point[1].n))
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+        hasher.update(int_to_bytes32(output_count*3))
         for i in range(0, output_count):
-            hasher.update(int_to_bytes32(output_count))
             hasher.update(self.output_transactions[i].pc_encrypted_data.message)
             hasher.update(int_to_bytes32(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)))
 
         subhashes = subhashes + [hasher.digest()]
-        
         hasher = sha3.keccak_256()
         for i in range(0, len(subhashes)):
+            print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
             hasher.update(subhashes[i])
 
         msgHash = hasher.digest()        

@@ -1,0 +1,816 @@
+[
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "totalSupply",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "key_images",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "balance_positive",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "baseArray",
+				"type": "uint256[]"
+			},
+			{
+				"name": "baseWidth",
+				"type": "uint256"
+			},
+			{
+				"name": "newColumns",
+				"type": "uint256[]"
+			},
+			{
+				"name": "newWidth",
+				"type": "uint256"
+			}
+		],
+		"name": "AddColumnsToArray",
+		"outputs": [
+			{
+				"name": "outArray",
+				"type": "uint256[]"
+			}
+		],
+		"payable": false,
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "G1",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "stealth_address",
+				"type": "address"
+			},
+			{
+				"name": "random",
+				"type": "uint256"
+			}
+		],
+		"name": "GenerateStealthTx",
+		"outputs": [
+			{
+				"name": "dest",
+				"type": "address"
+			},
+			{
+				"name": "dhe_point",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "PCurve",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "PubKey",
+				"type": "uint256[2]"
+			}
+		],
+		"name": "GetAddress",
+		"outputs": [
+			{
+				"name": "addr",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "privatekey",
+				"type": "uint256"
+			}
+		],
+		"name": "GetAddressFromPrivateKey",
+		"outputs": [
+			{
+				"name": "addr",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "pub_key_count",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "token_committed_balance",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "pub_keys_by_index",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "ethAddress",
+				"type": "address"
+			},
+			{
+				"name": "value",
+				"type": "uint256"
+			},
+			{
+				"name": "bf",
+				"type": "uint256"
+			},
+			{
+				"name": "dest_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "output_commitments",
+				"type": "uint256[]"
+			},
+			{
+				"name": "dest_dhe_points",
+				"type": "uint256[]"
+			}
+		],
+		"name": "HashWithdrawMsg",
+		"outputs": [
+			{
+				"name": "msgHash",
+				"type": "bytes32"
+			}
+		],
+		"payable": false,
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "stx_dhe_point_count",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "dest_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "output_commitments",
+				"type": "uint256[]"
+			},
+			{
+				"name": "dest_dhe_points",
+				"type": "uint256[]"
+			},
+			{
+				"name": "encrypted_data",
+				"type": "uint256[]"
+			}
+		],
+		"name": "HashSendMsg",
+		"outputs": [
+			{
+				"name": "msgHash",
+				"type": "bytes32"
+			}
+		],
+		"payable": false,
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "stx_dhe_points",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "H",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "stx_dhepoints_reverse",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "i",
+				"type": "uint256"
+			},
+			{
+				"name": "stx_privviewkey",
+				"type": "uint256"
+			},
+			{
+				"name": "stx_privspendkey",
+				"type": "uint256"
+			}
+		],
+		"name": "GetStealthTxPrivKey",
+		"outputs": [
+			{
+				"name": "privkey",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "stx_pubspendkeys",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "i",
+				"type": "uint256"
+			},
+			{
+				"name": "stx_privviewkey",
+				"type": "uint256"
+			},
+			{
+				"name": "stx_pubspendkey",
+				"type": "uint256"
+			}
+		],
+		"name": "GetStealthTxAddress",
+		"outputs": [
+			{
+				"name": "dest",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "stx_pubviewkeys",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "privatekey",
+				"type": "uint256"
+			}
+		],
+		"name": "GetPublicKeyFromPrivateKey",
+		"outputs": [
+			{
+				"name": "PubKey",
+				"type": "uint256[2]"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "pk",
+				"type": "uint256"
+			}
+		],
+		"name": "CalculateKeyImageFromPrivKey",
+		"outputs": [
+			{
+				"name": "I",
+				"type": "uint256[2]"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "Kill",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "data",
+				"type": "uint256[]"
+			}
+		],
+		"name": "DebugEventVar",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "pub_key",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"name": "dhe_point",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"name": "encrypted_data",
+				"type": "uint256[3]"
+			}
+		],
+		"name": "NewStealthTx",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"name": "_value",
+				"type": "uint256"
+			}
+		],
+		"name": "Withdrawal",
+		"type": "event"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "total_commit",
+				"type": "uint256[2]"
+			},
+			{
+				"name": "power10",
+				"type": "uint256"
+			},
+			{
+				"name": "offset",
+				"type": "uint256"
+			},
+			{
+				"name": "bit_commits",
+				"type": "uint256[]"
+			},
+			{
+				"name": "signature",
+				"type": "uint256[]"
+			}
+		],
+		"name": "CTProvePositive",
+		"outputs": [
+			{
+				"name": "success",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "redeem_eth_address",
+				"type": "address"
+			},
+			{
+				"name": "redeem_value",
+				"type": "uint256"
+			},
+			{
+				"name": "redeem_blinding_factor",
+				"type": "uint256"
+			},
+			{
+				"name": "dest_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "values",
+				"type": "uint256[]"
+			},
+			{
+				"name": "dest_dhe_points",
+				"type": "uint256[]"
+			},
+			{
+				"name": "encrypted_data",
+				"type": "uint256[]"
+			},
+			{
+				"name": "I",
+				"type": "uint256[]"
+			},
+			{
+				"name": "input_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "signature",
+				"type": "uint256[]"
+			}
+		],
+		"name": "Withdraw",
+		"outputs": [
+			{
+				"name": "success",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "data",
+				"type": "uint256[10]"
+			}
+		],
+		"name": "DebugEvent",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "_power10",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"name": "_offset",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"name": "_commitment",
+				"type": "uint256"
+			}
+		],
+		"name": "PCRangeProven",
+		"type": "event"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "dest_pub_key",
+				"type": "uint256"
+			},
+			{
+				"name": "dhe_point",
+				"type": "uint256"
+			}
+		],
+		"name": "Deposit",
+		"outputs": [],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "dest_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "dhe_points",
+				"type": "uint256[]"
+			},
+			{
+				"name": "values",
+				"type": "uint256[]"
+			}
+		],
+		"name": "DepositMultiple",
+		"outputs": [],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "dest_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "values",
+				"type": "uint256[]"
+			},
+			{
+				"name": "dest_dhe_points",
+				"type": "uint256[]"
+			},
+			{
+				"name": "encrypted_data",
+				"type": "uint256[]"
+			},
+			{
+				"name": "I",
+				"type": "uint256[]"
+			},
+			{
+				"name": "input_pub_keys",
+				"type": "uint256[]"
+			},
+			{
+				"name": "signature",
+				"type": "uint256[]"
+			}
+		],
+		"name": "Send",
+		"outputs": [
+			{
+				"name": "success",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "stx_pubspendkey",
+				"type": "uint256"
+			},
+			{
+				"name": "stx_pubviewkey",
+				"type": "uint256"
+			}
+		],
+		"name": "PublishSTxPublicKeys",
+		"outputs": [
+			{
+				"name": "success",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]

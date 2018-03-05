@@ -121,11 +121,9 @@ class RingCT:
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
         for i in range(0, len(subhashes)):
-            print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
             hasher.update(subhashes[i])
 
         msgHash = hasher.digest()
-        print("TotalHash: " + hex(bytes_to_int(msgHash)))
         neg_total_out_commitment = neg(add(multiply(H, in_value), multiply(G1, total_out_bf)))
     
         #Sum up last column
@@ -392,71 +390,13 @@ class RingCT:
 
         print(hex(self.mlsag.signature[L-1]))
 
-
-def RingCTTest(mixins = 2, inputs = 2, outputs = 2):
+def RingCTTest(input_count = 2, mixin_count = 3, outputs = 2, rngSeed=0):
     import random
-
-    print("Testing Ring CT...")
-    print("mixins = " + str(mixins) + ", inputs = " + str(inputs) + ", outputs = " + str(outputs))
-    print("n = " + str(mixins+1) + ", m = " + str(inputs+1))
-    print("--")
-
-    #Generate private keys that we can use
-    xk = []
-    xk_c = []
-    xk_v = []
-    xk_bf = []
-    xk_v_total = 0
-    for i in range(0, inputs):
-        xk = xk + [getRandom()]
-
-        print("PubKey" + str(i) + ": " + print_point(CompressPoint(multiply(G1, xk[i]))))
-        
-        xk_v = xk_v + [random.randrange(0, 100)]
-        xk_v_total = xk_v_total + xk_v[i]
-        xk_v[i] = xk_v[i] * (10**16)
-        
-        xk_bf = xk_bf + [getRandom()]
-        xk_c = xk_c + [add(multiply(G1, xk_bf[i]), multiply(H, xk_v[i]))]
-        print("C_Value" + str(i) + ": " + print_point(CompressPoint(xk_c[i])))
-        
-    print("--")
-    
-    #Generate other mixable keys and commitments (and dhe_points/encrypted messages, but these are unused)
-    mixin_tx = []
-    for i in range(0, inputs*mixins):
-        mixin_tx = mixin_tx + [StealthTransaction(multiply(G1, getRandom()), multiply(G1, getRandom()), multiply(G1, getRandom()), b"")]
-        
-    #Generate outputs and dhe_points
-    out_tx = []
-    v_out = []
-    bf_out = []
-    c_out = []
-    for i in range(0, outputs):
-        PubViewKey = multiply(G1, getRandom())
-        PubSpendKey = multiply(G1, getRandom())
-
-        if (i < (outputs - 1)):
-            r = random.randrange(0, xk_v_total)
-        else:
-            r = xk_v_total
-        
-        xk_v_total = xk_v_total - r            
-        v_out = v_out + [r*(10**16)]
-        bf_out = bf_out + [getRandom()]
-        c_out = c_out + [add(multiply(G1, bf_out[i]), multiply(H, v_out[i]))]
-
-        out_tx = out_tx + [StealthTransaction.Generate_GenRandom(multiply(G1, getRandom()), multiply(G1, getRandom()), v_out[i], bf_out[i])]
-
-    #Generate Ring CT Token Instance    
-    rct = RingCT.Sign(xk, xk_v, xk_bf, mixin_tx, out_tx, v_out, bf_out) 
-    return rct
-
-def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0):
-    import random
+    print()
+    print("================================")
     print("Running RingCT Test (Repeatable)")
-    print("input_count = 2")
-    print("mixin_count = 2")
+    print("input_count = " + str(input_count))
+    print("mixin_count = " + str(mixin_count))
     print("ring_size = " + str(input_count+1) + " x " + str(mixin_count+1))
     print("================================")
 
@@ -469,7 +409,11 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
     #Pre-fetch random values for repeatable results
     r_index = 0
     r = []
-    random.seed(seed)
+    if (rngSeed==0):
+        random.seed()
+    else:
+        random.seed(rngSeed)
+        
     for i in range(0, 100):
         r = r + [getRandomUnsafe()]
 
@@ -562,6 +506,9 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
     rct_mixin_tx = stealth_tx[input_count:]
 
     #Print Input data for MyEtherWallet
+    print()
+    print("================================")
+    print("MyEtherWallet Vectors")
     print("================================")
     print("Create Deposits (MEW):")
     print("value = " + str(xk_v_total))
@@ -596,8 +543,9 @@ def RingCTTest_Repeatable(input_count = 1, mixin_count = 2, outputs = 2, seed=0)
     print("RingCT Send (MEW):")
     rct = RingCT.Sign(rct_xk, rct_xk_v, rct_xk_bf, rct_mixin_tx, stealth_tx_out, stealth_tx_out_v, stealth_tx_out_bf)
     rct.Print_MEW()
-    return rct
 
-#tx = RingCTTest()
-#tx.Print_MEW()    
-tx = RingCTTest_Repeatable()
+    print("================================")
+    print("RingCT Withdraw (MEW):")
+    return rct
+   
+tx = RingCTTest()

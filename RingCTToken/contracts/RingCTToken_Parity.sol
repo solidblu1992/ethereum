@@ -812,7 +812,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//Deposit Ether as CT tokens to the specified alt_bn_128 public keys
 	//This function allows multiple deposits at onces
 	//NOTE: this deposited amount will NOT be confidential, initial blinding factor = 0
-	function Deposit(uint256[] dest_pub_keys, uint256[] dhe_points, uint256[] values)
+	function DepositMultiple(uint256[] dest_pub_keys, uint256[] dhe_points, uint256[] values)
 	    payable public
     {
         //Incoming Value must be non-zero
@@ -961,8 +961,6 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 			(P[2*v.i], P[2*v.i+1]) = (v.point3[0], v.point3[1]);
 		}
 		
-		DebugEventVar(P);
-		
         //Combine original public key set with new summations
 		//Note: this resizes P from (2*v.n) to (2*v.n*(v.m+1))
 		//P(before) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my,
@@ -975,8 +973,6 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 		//					...
 		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy, sigma(Pnj) + sigma(Pnj) - sigma(Ciout)	}
 		P = AddColumnsToArray(input_pub_keys, (2*v.m), P, 2);
-		DebugEventVar(P);
-		DebugEvent([uint256(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data)), 0, 0 ,0 ,0 ,0 ,0 , 0, 0, 0]);
         
         //Verify ring signature (MLSAG)
         if (!VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature)) return false;
@@ -1021,8 +1017,8 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 		
 		return true;
     }
-	
-	//Withdraw - destorys tokens via RingCT and redeems them for ETH
+    
+    	//Withdraw - destorys tokens via RingCT and redeems them for ETH
 	//Verifies an MLSAG ring signature over a set of public keys and the summation of their commitments and a set of output commitments.
 	//If successful, a new set of public keys (UTXO's) will be generated with masked values (pedersen commitments).  Each of these
 	//also has a DHE point so that the intended receiver is able to calculate the stealth address.  Additionally, the redeemed tokens
@@ -1182,7 +1178,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 		
 		return true;
     }
-    
+	
     //CT Functions
     //CTProvePositive
     //total_commit = uncompressed EC Point for total hidden value (pederen commitment)
@@ -1293,7 +1289,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//outArray =	{	a, b, c, d, 1, 2,
 	//					e, f, g, h, 3, 4,
 	//					i, j, k, m, 5, 6	}
-	function AddColumnsToArray(uint256[] newColumns, uint256 newWidth, uint256[] baseArray, uint256 baseWidth)
+	function AddColumnsToArray(uint256[] baseArray, uint256 baseWidth, uint256[] newColumns, uint256 newWidth)
 		public pure returns (uint256[] outArray)
 	{
 		//Check Array dimensions

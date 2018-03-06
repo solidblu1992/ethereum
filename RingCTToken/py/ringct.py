@@ -547,5 +547,3 @@ def RingCTTest(input_count = 2, mixin_count = 3, outputs = 2, rngSeed=0):
     print("================================")
     print("RingCT Withdraw (MEW):")
     return rct
-   
-tx = RingCTTest()

@@ -4,9 +4,9 @@ class StealthTransaction:
     pub_key = 0
     dhe_point = 0
     c_value = 0
-    pc_encrypted_data = b""
+    pc_encrypted_data = 0
     
-    def __init__(self, pub_key, dhe_point, c_value, pc_encrypted_data):
+    def __init__(self, pub_key=0, dhe_point=0, c_value=0, pc_encrypted_data=0):
         self.pub_key = pub_key
         self.dhe_point = dhe_point
         self.pc_encrypted_data = pc_encrypted_data
@@ -50,16 +50,24 @@ class StealthTransaction:
         return (self.pc_encrypted_data.Decrypt(ss))
 
     def Print(self):
-        print("Stealth Transaction:")
-        print("Public Key: " + print_point(CompressPoint(self.pub_key)))
-        print("DHE Point: " + print_point(CompressPoint(self.dhe_point)))
-        print("C_Value: " + print_point(CompressPoint(self.c_value)))
-        self.pc_encrypted_data.Print()
+        #print("Stealth Transaction:")
+        if (type(self.pub_key) == tuple):
+            print("Public Key: " + print_point(CompressPoint(self.pub_key)))
+
+        if (type(self.dhe_point) == tuple):
+            print("DHE Point: " + print_point(CompressPoint(self.dhe_point)))
+
+        if (type(self.c_value) == tuple):
+            print("C_Value: " + print_point(CompressPoint(self.c_value)))
+
+        if (type(self.pc_encrypted_data) != int):
+            self.pc_encrypted_data.Print()
 
     def PrintScalars(self):
-        s = self.pc_encrypted_data.to_scalars()
-        for i in range(0, len(s)):
-            print("s[" + str(i) + "]: " + hex(s[i]))
+        if (type(self.pc_encrypted_data) != int):
+            s = self.pc_encrypted_data.to_scalars()
+            for i in range(0, len(s)):
+                print("s[" + str(i) + "]: " + hex(s[i]))
     
 def StealthTxTest():
     MyPrivateViewKey = getRandom()

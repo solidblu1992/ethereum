@@ -130,10 +130,18 @@ def ExpandPoint(Pin):
 
     return Pout
 
-def getRandom():
+def getRandom(count=1):
     import random
-    out = (random.SystemRandom().getrandbits(254) % Ncurve)
+
+    if (count == 1):
+        out = (random.SystemRandom().getrandbits(254) % Ncurve)
+    else:
+        out = []
+        for i in range(0, count):
+            out = out + [random.SystemRandom().getrandbits(254) % Ncurve]
+
     return out
+
 
 def getRandomUnsafe(seed=None):
     import random

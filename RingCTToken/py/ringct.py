@@ -43,6 +43,11 @@ class RingCT:
         assert(len(mixin_transactions) % input_count == 0)
         n = len(mixin_transactions) // input_count + 1
 
+        if (type(output_transactions) != list):
+            output_transactions = [output_transactions]
+            out_v = [out_v]
+            out_bf = [out_bf]
+            
         output_count = len(output_transactions)
         assert(output_count > 0)
         assert(len(out_v) == output_count)

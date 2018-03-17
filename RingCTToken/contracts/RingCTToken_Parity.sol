@@ -25,10 +25,10 @@ contract Debuggable {
 
 contract ECMath is Debuggable {
 	//alt_bn128 constants
-	uint256[2] public G1;
-	uint256[2] public H;
+	uint256[2] internal G1;
+	uint256[2] internal H;
 	uint256 constant internal NCurve = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
-	uint256 constant public PCurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
+	uint256 constant internal PCurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
 	//Used for Point Compression/Decompression
 	uint256 constant internal ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
@@ -218,101 +218,6 @@ contract ECMath is Debuggable {
     }
 }
 
-contract StealthTransaction is ECMath {
-	function StealthTransaction() public {
-		//Constructor Logic
-	}
-	
-	//Stealth Address Mappings
-	mapping (address => uint256) public stx_pubviewkeys;    //Stores A=aG (public view key)
-    mapping (address => uint256) public stx_pubspendkeys;   //Stores B=bG (public spend key)
-    mapping (uint256 => uint256) public stx_dhe_points;     //Stores R=rG for each stealth transaction
-    mapping (uint256 => bool) public stx_dhepoints_reverse; //Reverse lookup for dhe_points
-	uint256 public stx_dhe_point_count;
-	
-	event NewStealthTx (
-	    uint256 pub_key,
-	    uint256 dhe_point,
-	    uint256[3] encrypted_data
-	);
-	
-	//Stealth Address Functions
-    //For a given msg.sender (ETH address) publish EC points for public spend and view keys
-    //These EC points will be used to generate stealth addresses
-    function PublishSTxPublicKeys(uint256 stx_pubspendkey, uint256 stx_pubviewkey)
-        public returns (bool success)
-    {
-        stx_pubspendkeys[msg.sender] = stx_pubspendkey;
-        stx_pubviewkeys[msg.sender] = stx_pubviewkey;
-        success = true;
-    }
-    
-    //Generate stealth transaction (off-chain)
-    function GenerateStealthTx(address stealth_address, uint256 random)
-        public constant returns (address dest, uint256 dhe_point)
-    {
-        //Verify that destination address has published spend and view keys
-        if (stx_pubspendkeys[stealth_address] == 0 || stx_pubviewkeys[stealth_address] == 0) return (0,0);
-        
-        //Generate DHE Point (R = rG)
-        uint256[2] memory temp;
-        
-        temp = ecMul(G1, random);
-        dhe_point = CompressPoint(temp);
-        
-        //Generate shared secret ss = H(rA) = H(arG)
-        temp[0] = HashOfPoint(ecMul(ExpandPoint(stx_pubviewkeys[stealth_address]), random));
-        
-        //Calculate target address public key P = ss*G + B
-        temp = ecMul(G1, temp[0]);
-        temp = ecAdd(temp, ExpandPoint(stx_pubspendkeys[stealth_address]));
-        
-        //Calculate target address from public key
-        dest = GetAddress(temp);
-    }
-    
-    //Calulates Stealth Address from index i of stx_dhepoints (off-chain)
-    //This function can be used to check for non-zero value addresses (are they applicable?)
-    function GetStealthTxAddress(uint256 i, uint256 stx_privviewkey, uint256 stx_pubspendkey)
-        public constant returns (address dest)
-    {
-        //If i >= stx_dhepoint_count then automatically the address is not used
-        if (i >= stx_dhe_point_count) return 0;
-        
-        //Expand dhe point (R = rG)
-        uint256[2] memory temp;
-        temp = ExpandPoint(stx_dhe_points[i]);
-        
-        //Calculate shared secret ss = H(aR) = H(arG)
-        temp[0] = HashOfPoint(ecMul(temp, stx_privviewkey));
-        
-        //Calculate target address public key P = ss*G + B
-        temp = ecMul(G1, temp[0]);
-        temp = ecAdd(temp, ExpandPoint(stx_pubspendkey));
-        
-        //Calculate target address from public key
-        dest = GetAddress(temp);
-    }
-    
-    //Calculates private key for stealth tx
-    function GetStealthTxPrivKey(uint256 i,uint256 stx_privviewkey, uint256 stx_privspendkey)
-        public constant returns (uint256 privkey)
-    {
-        //If i >= stx_dhepoint_count then automatically the address is not used
-        if (i >= stx_dhe_point_count) return 0;
-        
-        //Expand dhe point (R = rG)
-        uint256[2] memory temp;
-        temp = ExpandPoint(stx_dhe_points[i]);
-        
-        //Calculate shared secret ss = H(aR) = H(arG)
-        temp[0] = HashOfPoint(ecMul(temp, stx_privviewkey));
-        
-        //Calculate private key = ss + b
-        privkey = addmod(temp[0], stx_privspendkey, NCurve);
-    }
-}
-
 contract MLSAG_Algorithms is ECMath {
     function MLSAG_Algorithms() public {
         //Constructor
@@ -386,7 +291,7 @@ contract MLSAG_Algorithms is ECMath {
     }
     
     function CalculateKeyImageFromPrivKey(uint256 pk)
-        public constant returns (uint256[2] I)
+        internal constant returns (uint256[2] I)
     {
         uint256[2] memory temp;
         temp = ecMul(G1, pk);
@@ -498,26 +403,6 @@ contract MLSAG_Verify is MLSAG_Algorithms {
         success = (v.ck == signature[0]);
     }
     
-    //Verify SAG (Spontaneous Ad-hoc Group Signature, non-linkable)
-    //Using compressed EC points
-    //msgHash = hash of message signed by ring signature
-    //P = {P1, P2, ... , Pn}
-    //signature = {c1, s1, s2, ... , sn}
-    function VerifySAG_Compressed(bytes32 msgHash, uint256[] P, uint256[] signature)
-        internal constant returns (bool success)
-    {
-        uint256[2] memory temp;
-        uint256[] memory P_uncomp = new uint256[](P.length*2);
-        
-        for (uint256 i = 0; i < P.length; i++) {
-            temp = ExpandPoint(P[i]);
-            P_uncomp[2*i] = temp[0];
-            P_uncomp[2*i+1] = temp[1];
-        }
-        
-        return VerifySAG(msgHash, P_uncomp, signature);
-    }
-    
     //Verify LSAG (Linkable Spontaneous Ad-hoc Group Signature)
     //msgHash = hash of message signed by ring signature
     //I = {Ix, Iy}
@@ -543,32 +428,6 @@ contract MLSAG_Verify is MLSAG_Algorithms {
         
         //See if c1 matches the original c1
         success = (v.ck == signature[0]);
-    }
-    
-    //Verify LSAG (Linkable Spontaneous Ad-hoc Group Signature)
-    //Using compressed EC points
-    //msgHash = hash of message signed by ring signature
-    //I = key image (compressed EC point)
-    //P = {P1, P2, ... , Pn}
-    //signature = {c1, s1, s2, ... , sn}
-    function VerifyLSAG_Compressed(bytes32 msgHash, uint256 I, uint256[] P, uint256[] signature)
-        internal constant returns (bool success)
-    {
-        uint256[2] memory temp;
-        uint256[] memory P_uncomp = new uint256[](P.length*2);
-        uint256[] memory I_uncomp = new uint256[](2);
-        
-        uint256 i;
-        for (i = 0; i < P.length; i++) {
-            temp = ExpandPoint(P[i]);
-            P_uncomp[2*i] = temp[0];
-            P_uncomp[2*i+1] = temp[1];
-        }
-        
-        temp = ExpandPoint(I);
-        (I_uncomp[0], I_uncomp[1]) = (temp[0], temp[1]);
-        
-        return VerifyLSAG(msgHash, I_uncomp, P_uncomp, signature);
     }
     
     //Verify MSAG (Multilayered Spontaneous Ad-hoc Group Signature, non-linkable)
@@ -620,31 +479,6 @@ contract MLSAG_Verify is MLSAG_Algorithms {
         
         //See if c1 matches the original c1
         success = (v.ck == signature[0]);
-    }
-    
-    //Verify MSAG (Multilayered Spontaneous Ad-hoc Group Signature, non-linkable)
-    //Using compressed EC points
-    //msgHash = hash of message signed by ring signature
-    //P = { P11, P12, ..., P1m,
-    //      P21, P22, ..., P2m,
-    //      Pn1, Pn2, ..., Pnm }
-    //signature = {c1,  s11, s12, ..., s1m,
-    //                  s21, s22, ..., s2m,
-    //                  sn1, sn2, ..., snm  }
-    function VerifyMSAG_Compressed(uint256 m, bytes32 msgHash, uint256[] P, uint256[] signature)
-        internal constant returns (bool success)
-    {
-        uint256[2] memory temp;
-        uint256[] memory P_uncomp = new uint256[](P.length*2);
-        
-        uint256 i;
-        for (i = 0; i < P.length; i++) {
-            temp = ExpandPoint(P[i]);
-            P_uncomp[2*i] = temp[0];
-            P_uncomp[2*i+1] = temp[1];
-        }
-        
-        return VerifyMSAG(m, msgHash, P_uncomp, signature);
     }
     
     //Verify MLSAG (Multilayered Linkable Spontaneous Ad-hoc Group Signature)
@@ -702,36 +536,39 @@ contract MLSAG_Verify is MLSAG_Algorithms {
         //See if c1 matches the original c1
         success = (v.ck == signature[0]);
     }
-    
-    //Verify MLSAG (Multilayered Linkable Spontaneous Ad-hoc Group Signature)
-    //Using compressed EC points
-    //msgHash = hash of message signed by ring signature
-    //I = { I1, I2, ..., Im }
-    //P = { P11, P12, ..., P1m,
-    //      P21, P22, ..., P2m,
-    //      Pn1, Pn2, ..., Pnm }
-    //signature = {c1, s11, s12, ..., s1m, s21, s22, ..., s2m, ..., sn1, sn2, ..., snm}
-    function VerifyMLSAG_Compressed(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
-        internal constant returns (bool success)
+}
+
+contract StealthTransaction is ECMath {
+	function StealthTransaction() public {
+		//Constructor Logic
+	}
+	
+	//Stealth Address Mappings
+	mapping (address => uint256) public stx_pubviewkeys;    //Stores A=aG (public view key) for a given Ethereum Address
+    mapping (address => uint256) public stx_pubspendkeys;   //Stores B=bG (public spend key) for a given Ethereum Address
+	
+	event StealthTxPublished(
+		uint256 pubviewkey,
+		uint256 pubspendkey
+	);
+	
+	event NewStealthTx (
+	    uint256 pub_key,
+	    uint256 dhe_point,
+	    uint256[3] encrypted_data
+	);
+	
+	//Stealth Address Functions
+    //For a given msg.sender (ETH address) publish EC points for public spend and view keys
+    //These EC points will be used to generate stealth addresses
+    function PublishSTxPublicKeys(uint256 stx_pubviewkey, uint256 stx_pubspendkey)
+        public returns (bool success)
     {
-        uint256[2] memory temp;
-        uint256[] memory P_uncomp = new uint256[](P.length*2);
-        uint256[] memory I_uncomp = new uint256[](I.length*2);
-        
-        uint256 i;
-        for (i = 0; i < P.length; i++) {
-            temp = ExpandPoint(P[i]);
-            P_uncomp[2*i] = temp[0];
-            P_uncomp[2*i+1] = temp[1];
-        }
-        
-        for (i = 0; i < I.length; i++) {
-            temp = ExpandPoint(I[i]);
-            I_uncomp[2*i] = temp[0];
-            I_uncomp[2*i+1] = temp[1];
-        }
-        
-        return VerifyMLSAG(msgHash, I_uncomp, P_uncomp, signature);
+        stx_pubviewkeys[msg.sender] = stx_pubviewkey;
+		stx_pubspendkeys[msg.sender] = stx_pubspendkey;
+		
+		emit StealthTxPublished(stx_pubviewkey, stx_pubspendkey);
+        success = true;
     }
 }
 
@@ -752,11 +589,6 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	    uint256 _offset,
 	    uint256 _commitment
 	);
-	
-	//Mapping of EC Public Key to encrypted data (e.g. value and blinding factor)
-	//mapping (uint256 => uint256) public encrypted_data0;
-	//mapping (uint256 => uint256) public encrypted_data1;
-	//mapping (uint256 => uint256) public encrypted_data2;
 	
 	//Mapping of uint256 index (0...pub_key_count-1) to known public keys (for finding mix in keys)
 	mapping (uint256 => uint256) public pub_keys_by_index;
@@ -788,22 +620,9 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     	token_committed_balance[dest_pub_key] = CompressPoint(ecMul(H, msg.value));
     	pub_keys_by_index[pub_key_count] = dest_pub_key;
     	pub_key_count++;
-    
-    	//Store DHE point if not already in dhe point set
-    	if (!stx_dhepoints_reverse[dhe_point]) {
-        	stx_dhe_points[stx_dhe_point_count] = dhe_point;
-        	stx_dhepoints_reverse[dhe_point] = true;
-        	stx_dhe_point_count++;
-    	}
-    	
-    	        	
-    	//Store non-encrypted value (bf and iv = 0)
-    	//encrypted_data0[dest_pub_key] = msg.value;
-    	//encrypted_data1[dest_pub_key] = 0;
-    	//encrypted_data_iv[dest_pub_key] = 0;
     	
     	//Log new stealth transaction
-    	NewStealthTx(dest_pub_key, dhe_point, [msg.value, 0, 0]);
+    	emit NewStealthTx(dest_pub_key, dhe_point, [msg.value, 0, 0]);
     	
     	//Update global token supply
     	totalSupply += msg.value;
@@ -840,22 +659,9 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
         	token_committed_balance[dest_pub_keys[i]] = CompressPoint(ecMul(H, values[i]));
         	pub_keys_by_index[pub_key_count] = dest_pub_keys[i];
         	pub_key_count++;
-        
-        	//Store DHE point if not already in dhe point set
-        	if (!stx_dhepoints_reverse[dhe_points[i]]) {
-            	//Store DHE point 
-            	stx_dhe_points[stx_dhe_point_count] = dhe_points[i];
-            	stx_dhepoints_reverse[dhe_points[i]] = true;
-            	stx_dhe_point_count++;
-        	}
-        	
-        	//Store non-encrypted value (bf and iv = 0)
-			//encrypted_data0[dest_pub_keys[i]] = values[i];
-			//encrypted_data1[dest_pub_keys[i]] = 0;
-			//encrypted_data_iv[dest_pub_keys[i]] = 0;
     	
     	    //Log new stealth transaction
-        	NewStealthTx(dest_pub_keys[i], dhe_points[i], [values[i], 0, 0]);
+        	emit NewStealthTx(dest_pub_keys[i], dhe_points[i], [values[i], 0, 0]);
     	}
     	
     	//Update global token supply
@@ -998,27 +804,15 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 			token_committed_balance[v.point1[0]] = v.point2[0];	//Store output commitment			
 			pub_keys_by_index[pub_key_count] = v.point1[0];		//Store public key
 			pub_key_count++;
-			
-			//Publish DHE point if not already in published set
-			if (!stx_dhepoints_reverse[v.point3[0]]) {
-    			stx_dhe_points[stx_dhe_point_count] = v.point3[0];			//Store DHE point (for calculating stealth address)
-    			stx_dhepoints_reverse[v.point3[0]] = true;
-    			stx_dhe_point_count++;
-			}
-			
-			//Store encrypted data and iv
-			//encrypted_data0[v.point1[0]] = encrypted_data[3*v.i];
-			//encrypted_data1[v.point1[0]] = encrypted_data[3*v.i+1];
-			//encrypted_data2[v.point1[0]] = encrypted_data[3*v.i+2];
-			
+
 			//Log new stealth transaction
-			NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
+			emit NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
 		}
 		
 		return true;
     }
     
-    	//Withdraw - destorys tokens via RingCT and redeems them for ETH
+    //Withdraw - destorys tokens via RingCT and redeems them for ETH
 	//Verifies an MLSAG ring signature over a set of public keys and the summation of their commitments and a set of output commitments.
 	//If successful, a new set of public keys (UTXO's) will be generated with masked values (pedersen commitments).  Each of these
 	//also has a DHE point so that the intended receiver is able to calculate the stealth address.  Additionally, the redeemed tokens
@@ -1154,33 +948,21 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 			pub_keys_by_index[pub_key_count] = v.point1[0];		//Store public key
 			pub_key_count++;
 			
-			//Publish DHE point if not already in published set
-			if (!stx_dhepoints_reverse[v.point3[0]]) {
-    			stx_dhe_points[stx_dhe_point_count] = v.point3[0];			//Store DHE point (for calculating stealth address)
-    			stx_dhepoints_reverse[v.point3[0]] = true;
-    			stx_dhe_point_count++;
-			}
-			
-		   //Store encrypted data and iv
-			//encrypted_data0[v.point1[0]] = encrypted_data[3*v.i];
-			//encrypted_data1[v.point1[0]] = encrypted_data[3*v.i+1];
-			//encrypted_data2[v.point1[0]] = encrypted_data[3*v.i+2];
-			
 			//Log new stealth transaction
-			NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
+			emit NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
 		}
 		
 		//Send redeemed value
 		redeem_eth_address.transfer(redeem_value);
 		
 		//Log Withdrawal
-		Withdrawal(redeem_eth_address, redeem_value);
+		emit Withdrawal(redeem_eth_address, redeem_value);
 		
 		return true;
     }
 	
     //CT Functions
-    //CTProvePositive
+    //PCProvePositive
     //total_commit = uncompressed EC Point for total hidden value (pederen commitment)
     //power10 = additional scalar to be applied to bitwise commitments (public information)
     //offset = additional offset to be added to bitwise commitments (public information)
@@ -1195,7 +977,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
     //          C1',   C2',   ..., Cm',
     //          C1'',  C2'',  ..., Cm'',
     //          C1''', C2''', ..., Cm''' }
-    function CTProvePositive(uint256[2] total_commit, uint256 power10, uint256 offset, uint256[] bit_commits, uint256[] signature)
+    function PCProvePositive(uint256[2] total_commit, uint256 power10, uint256 offset, uint256[] bit_commits, uint256[] signature)
         public returns (bool success)
     {
         //Get number of bits to prove
@@ -1256,20 +1038,20 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
         
         if (success) {
             balance_positive[total_commit[0]] = true;
-            PCRangeProven(power10, offset, total_commit[0]);
+            emit PCRangeProven(power10, offset, total_commit[0]);
         }
     }
     
     //Utility Functions
     function HashSendMsg(uint256[] dest_pub_keys, uint256[] output_commitments, uint256[] dest_dhe_points, uint256[] encrypted_data)
-        public pure returns (bytes32 msgHash)
+        internal pure returns (bytes32 msgHash)
     {
         msgHash = keccak256(Keccak256OfArray(dest_pub_keys), Keccak256OfArray(output_commitments), Keccak256OfArray(dest_dhe_points), Keccak256OfArray(encrypted_data));
     }
 	
 	function HashWithdrawMsg(	address ethAddress, uint256 value, uint256 bf,
 								uint256[] dest_pub_keys, uint256[] output_commitments, uint256[] dest_dhe_points)
-		public pure returns (bytes32 msgHash)
+		internal pure returns (bytes32 msgHash)
 	{
 		msgHash = keccak256(ethAddress, value, bf, Keccak256OfArray(dest_pub_keys), Keccak256OfArray(output_commitments), Keccak256OfArray(dest_dhe_points));
 	}
@@ -1290,7 +1072,7 @@ contract RingCTToken is MLSAG_Verify, StealthTransaction {
 	//					e, f, g, h, 3, 4,
 	//					i, j, k, m, 5, 6	}
 	function AddColumnsToArray(uint256[] baseArray, uint256 baseWidth, uint256[] newColumns, uint256 newWidth)
-		public pure returns (uint256[] outArray)
+		internal pure returns (uint256[] outArray)
 	{
 		//Check Array dimensions
 		if (baseArray.length % baseWidth != 0) return;

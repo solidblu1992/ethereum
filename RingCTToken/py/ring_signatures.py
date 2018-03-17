@@ -25,6 +25,15 @@ def int_to_iterable(i):
 
     return x
 
+def int_to_bytes64(i):
+    x = bytes(int_to_iterable(i% 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
+
+    if (len(x) < 64):
+        y = bytes(64 - len(x))
+        x = y+x
+
+    return x
+
 def int_to_bytes32(i):
     x = bytes(int_to_iterable(i% 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff))
 

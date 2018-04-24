@@ -1,27 +1,73 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.22;
 
 import "./Debuggable.sol";
 
 contract ECMath is Debuggable {
 	//alt_bn128 constants
-	uint256[2] public G1;
-	uint256[2] public H;
-	uint256 constant internal NCurve = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
-	uint256 constant public PCurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
+	uint256[2] private G1;
+	uint256[2] private H;
+	uint256[2] private Inf;
+	uint256 constant private NCurve = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
+	uint256 constant private PCurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
 	//Used for Point Compression/Decompression
-	uint256 constant internal ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
-	uint256 constant internal a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
+	uint256 constant private ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
+	uint256 constant private a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
 	
-	function ECMath() public {
+	constructor() public {
         G1[0] = 1;
     	G1[1] = 2;
+		
     	H = HashToPoint(G1);
+		
+		Inf[0] = 0;
+		Inf[1] = 0;
+	}
+	
+	//Base EC Parameters
+	function GetG1() public view returns (uint256[2]) { return G1; }
+	function GetH() public view returns (uint256[2]) { return H; }
+	function GetInfinity() public view returns (uint256[2]) { return Inf; }
+	function GetNCurve() public pure returns (uint256) { return NCurve; }
+	function GetPCurve() public pure returns (uint256) { return PCurve; }
+	
+	function GetGHVector(uint256 length)
+		public constant returns (uint256[] Gxi, uint256[] Gyi, uint256[] Hxi, uint256[] Hyi)
+	{
+	    require(length > 0);
+	    
+		uint256[2] memory temp;
+		Gxi = new uint256[](length);
+		Gyi = new uint256[](length);
+		Hxi = new uint256[](length);
+		Hyi = new uint256[](length);
+		
+		temp = H;
+		for (uint256 i = 0; i < length; i++) {
+			temp = HashToPoint(temp);
+			(Gxi[i], Gyi[i]) = (temp[0], temp[1]);
+			
+			temp = HashToPoint(temp);
+			(Hxi[i], Hyi[i]) = (temp[0], temp[1]);
+		}
 	}
 	
 	//Base EC Functions
-	function ecAdd(uint256[2] p0, uint256[2] p1)
-    	internal constant returns (uint256[2] p2)
+	function Negate(uint256[2] p1)
+		public pure returns (uint256[2] p2)
+	{	
+		p2[0] = p1[0];
+		p2[1] = PCurve - (p1[1] % PCurve);
+	}
+	
+	function Equals(uint256[2] p1, uint256[2] p2)
+		public pure returns (bool)
+	{
+		return ((p1[0] == p2[0]) && (p1[1] == p2[1]));
+	}
+	
+	function Add(uint256[2] p0, uint256[2] p1)
+    	public constant returns (uint256[2] p2)
 	{
     	assembly {
         	//Get Free Memory Pointer
@@ -45,8 +91,14 @@ contract ECMath is Debuggable {
     	}
 	}
     
-	function ecMul(uint256[2] p0, uint256 s)
-    	internal constant returns (uint256[2] p1)
+	function Subtract(uint256[2] p0, uint256[2] p1)
+    	public constant returns (uint256[2] p2)
+	{
+		return Add(p0, Negate(p1));
+	}
+	
+	function Multiply(uint256[2] p0, uint256 s)
+    	public constant returns (uint256[2] p1)
 	{
     	assembly {
         	//Get Free Memory Pointer
@@ -69,8 +121,72 @@ contract ECMath is Debuggable {
     	}
 	}
     
+    //Shortcut Functions
+    function MultiplyG1(uint256 s)
+        public constant returns (uint256[2] p0)
+    {
+        return Multiply(G1, s);
+    }
+    
+    function MultiplyH(uint256 s)
+        public constant returns (uint256[2] p0)
+    {
+        return Multiply(H, s);
+    }
+    
+    //Returns p0 = p_add + s*p_mul
+    function AddMultiply(uint256[2] p_add, uint256[2] p_mul, uint256 s)
+        public constant returns (uint256[2] p0)
+    {
+        return Add(p_add, Multiply(p_mul, s));
+    }
+    
+    //Returns p0 = p_add + s*G1    
+    function AddMultiplyG1(uint256[2] p_add, uint256 s)
+        public constant returns (uint256[2] p0)
+    {
+        return AddMultiply(p_add, G1, s);
+    }
+    
+    //Returns p0 = p_add + s*H
+    function AddMultiplyH(uint256[2] p_add, uint256 s)
+        public constant returns (uint256[2] p0)
+    {
+        return AddMultiply(p_add, H, s);
+    }
+    
+    function CommitG1H(uint256 s_G1, uint256 s_H)
+        public constant returns (uint256[2] p0)
+    {
+        return Add(MultiplyG1(s_G1), MultiplyH(s_H));
+    }
+    
+    //Returns px = x[0]*Gi[0] + x[1]*Gi[1] + ... + x[n-1]*Gi[n-1]
+    //    and py = y[0]*Hi[0] + y[1]*Hi[1] + ... + y[n-1]*Hi[n-1]
+    function CommitGxHx(uint256[] x, uint256[] y)
+        public constant returns (uint256[2] px, uint256[2] py)
+    {
+        require(x.length > 0);
+        require(x.length == y.length);
+        
+        uint256 i;
+        uint256[] memory Gxi;
+        uint256[] memory Gyi;
+        uint256[] memory Hxi;
+        uint256[] memory Hyi;
+        (Gxi, Gyi, Hxi, Hyi) = GetGHVector(x.length);
+        
+        px = Multiply([Gxi[0], Gyi[0]], x[0]);
+        py = Multiply([Hxi[0], Hyi[0]], y[0]);
+        for (i = 1; i < x.length; i++) {
+            px = AddMultiply(px, [Gxi[i], Gyi[i]], x[i]);
+            py = AddMultiply(py, [Hxi[i], Hyi[i]], y[i]);
+        }
+    }
+    
+    //Point Compression and Expansion Functions
 	function CompressPoint(uint256[2] Pin)
-    	internal pure returns (uint256 Pout)
+    	public pure returns (uint256 Pout)
 	{
     	//Store x value
     	Pout = Pin[0];
@@ -82,7 +198,7 @@ contract ECMath is Debuggable {
 	}
     
 	function EvaluateCurve(uint256 x)
-    	internal constant returns (uint256 y, bool onCurve)
+    	public constant returns (uint256 y, bool onCurve)
 	{
     	uint256 y_squared = mulmod(x,x, PCurve);
     	y_squared = mulmod(y_squared, x, PCurve);
@@ -118,7 +234,7 @@ contract ECMath is Debuggable {
 	}
     
 	function ExpandPoint(uint256 Pin)
-    	internal constant returns (uint256[2] Pout)
+    	public constant returns (uint256[2] Pout)
 	{
     	//Get x value (mask out sign bit)
     	Pout[0] = Pin & (~ECSignMask);
@@ -163,7 +279,7 @@ contract ECMath is Debuggable {
     function GetPublicKeyFromPrivateKey(uint256 privatekey)
         public constant returns (uint256[2] PubKey)
     {
-        PubKey = ecMul(G1, privatekey);
+        PubKey = Multiply(G1, privatekey);
     }
     
     function GetAddressFromPrivateKey(uint256 privatekey)
@@ -174,7 +290,7 @@ contract ECMath is Debuggable {
 
     //Return H = keccak256(p)
     function HashOfPoint(uint256[2] point)
-        internal pure returns (uint256 h)
+        public pure returns (uint256 h)
     {
         bytes32 b = keccak256(point[0], point[1]);
         h = uint256(b);
@@ -182,7 +298,7 @@ contract ECMath is Debuggable {
     
 	//Return H = alt_bn128 evaluated at keccak256(p)
     function HashToPoint(uint256[2] p)
-        internal constant returns (uint256[2] h)
+        public constant returns (uint256[2] h)
     {
         h[0] = uint256(HashOfPoint(p)) % PCurve;
         

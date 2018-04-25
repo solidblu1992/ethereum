@@ -21,7 +21,7 @@ def RingCTTokenTestImport(stealth_addr, transaction_pool):
     
     return rct
 
-def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, output_count = 1):
+def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, output_count = 2):
     rct = RingCTToken()
     rct.debugPrintingEnabled = False
     
@@ -53,11 +53,21 @@ def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, outp
     PrintTxExportAsDeposit(rct.ExportUTXOPool() + rct.ExportMixinPool(), rct.ExportStealthAddress())
 
     #Create Spend Transaction
-    tx = rct.SpendTx(list(range(0,input_count)), output_count)
+    if (output_count == 1):
+        output_values = None
+    else:
+        output_values = output_count
+        #output_values = [5, 10, 7, ...]
+        
+    tx0 = rct.SendTx(list(range(0,input_count)), mixin_count, output_values)
+    rct.MarkUTXOAsSpent(list(range(0,input_count)))
+    rct.MintPendingUTXOs(list(range(0,input_count)))
     
-    return rct
+    #tx1 = rct.WithdrawTx([7], mixin_count, None)
+    
+    return (rct, tx0)
 
-rct = RingCTTokenTest()
+(rct, tx0) = RingCTTokenTest()
 #rct = RingCTTokenTestImport(StealthAddressExport, UTXOPoolExport + MixinPoolExport)
 #PrintTxExportAsDeposit(UTXOPoolExport + MixinPoolExport, StealthAddressExport)
 #sig = rct.SpendTx([1,5])

@@ -193,7 +193,6 @@ class RingCT:
         hasher = sha3.keccak_256()
         hasher.update(int_to_bytes32(output_count*2))
         for i in range(0, output_count):
-            assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])),self.output_transactions[i].c_value)) 
             hasher.update(int_to_bytes32(self.output_transactions[i].c_value[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].c_value[1].n))
 
@@ -214,7 +213,7 @@ class RingCT:
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
         for i in range(0, len(subhashes)):
-            print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
+            #print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
             hasher.update(subhashes[i])
 
         msgHash = hasher.digest()        

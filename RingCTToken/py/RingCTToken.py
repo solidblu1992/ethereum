@@ -128,8 +128,9 @@ class RingCTToken:
         if (self.debugPrintingEnabled):
             print("\nNew Mixin Transactions (" + str(count) + ") Generated:")
         
-        for i in range(0, count):
-            stealth_tx = StealthTransaction(multiply(G1, getRandom()), multiply(G1, getRandom()), multiply(G1, 1*10**16), PCAESMessage.Encrypt(getRandom(), getRandom(), getRandom()))
+        for i in range(0, len(count)):
+            stealth_tx = StealthTransaction(multiply(G1, getRandom()), multiply(G1, getRandom()), multiply(G1, 1*10**14), PCAESMessage.Encrypt(getRandom(), getRandom(), getRandom()))
+                
             self.MixinTxPool = self.MixinTxPool + [stealth_tx]
 
             if(self.debugPrintingEnabled):
@@ -194,7 +195,7 @@ class RingCTToken:
                 self.MixinTxPool = self.MixinTxPool + [tx]
 
     #Generate Spend Tx
-    def SpendTx(self, UTXOindices, mixins=2, pubViewKey=None, pubSpendKey=None):
+    def SpendTx(self, UTXOindices, mixins=2, outputs=1, pubViewKey=None, pubSpendKey=None):
         UTXOindices = list(set(UTXOindices)) #remove duplicates
         mixin_count = len(UTXOindices)*mixins
         assert((len(self.MixinTxPool)+len(self.MyUTXOPool)-len(UTXOindices)) >= mixin_count) #Must have enough mixin transactions to perform Tx
@@ -207,7 +208,7 @@ class RingCTToken:
         in_bfs = [0] * len(UTXOindices)
         in_xk = [0] * len(UTXOindices)
         for i in range(0, len(UTXOindices)):
-            in_utxos = in_utxos + [self.MyUTXOPool[i]]
+            in_utxos = in_utxos + [self.MyUTXOPool[UTXOindices[i]]]
             (in_values[i], in_bfs[i]) = in_utxos[i].DecryptData(self.MyPrivateSpendKey)
             in_xk[i] = in_utxos[i].GetPrivKey(self.MyPrivateViewKey, self.MyPrivateSpendKey)
 
@@ -228,7 +229,7 @@ class RingCTToken:
                 index = index - len(self.MixinTxPool)
                 mixin_tx[i] = self.MyUTXOPool[rem_utxo_indices[index]]
 
-        #Generate output transaction
+        #Generate output transactions
         out_value = 0
         out_bf = getRandom()
         for i in range(0, len(in_values)):
@@ -258,6 +259,7 @@ class RingCTToken:
         print("Send Tx Data")
         print("============================================")
         sig.Print_MEW()
+        return sig
         
 
     def PrintStealthAddress(self):
@@ -291,9 +293,21 @@ class RingCTToken:
         print()
 
     def ExportStealthAddress(self):
+        return [self.MyPrivateViewKey, self.MyPrivateSpendKey]
+
+    def ExportStealthAddressToPython(self):
         print("StealthAddressExport = [" + hex(self.MyPrivateViewKey) + ", " + hex(self.MyPrivateSpendKey) + "]")
 
     def ExportUTXOPool(self):
+        pool = []
+        for i in range(0, len(self.MyUTXOPool)):
+            pool = pool + [[CompressPoint(self.MyUTXOPool[i].pub_key), CompressPoint(self.MyUTXOPool[i].dhe_point),
+                           CompressPoint(self.MyUTXOPool[i].c_value), bytes_to_int(self.MyUTXOPool[i].pc_encrypted_data.message),
+                           bytes_to_int(self.MyUTXOPool[i].pc_encrypted_data.iv)]]
+
+        return pool
+
+    def ExportUTXOPoolToPython(self):
         print("UTXOPoolExport =\n[", end="")
         for i in range(0, len(self.MyUTXOPool)):
             #[pub_key, dhe_point, c_value, encrypted message, iv]
@@ -310,6 +324,15 @@ class RingCTToken:
         print()
 
     def ExportMixinPool(self):
+        pool = []
+        for i in range(0, len(self.MixinTxPool)):
+            pool = pool + [[CompressPoint(self.MixinTxPool[i].pub_key), CompressPoint(self.MixinTxPool[i].dhe_point),
+                           CompressPoint(self.MixinTxPool[i].c_value), bytes_to_int(self.MixinTxPool[i].pc_encrypted_data.message),
+                           bytes_to_int(self.MixinTxPool[i].pc_encrypted_data.iv)]]
+
+        return pool
+
+    def ExportMixinPoolToPython(self):
         print("MixinPoolExport =\n[", end="")
         for i in range(0, len(self.MixinTxPool)):
             #[pub_key, dhe_point, c_value, encrypted message, iv]
@@ -324,118 +347,3 @@ class RingCTToken:
             else:
                 print("]")
         print()
-
-#Imports
-from RingCTImports import *
-
-def PrintTxExportAsDeposit(transaction_pool, stealth_addr=None):
-    print("Deposit Transactions:")
-    #pub_keys
-    print("Pub Keys:")
-    #print("[", end = "")
-    for i in range (0, len(transaction_pool)):
-        print(hex(transaction_pool[i][0]), end = "")
-        if (i < (len(transaction_pool)-1)):
-            print(",")
-        else:
-            print()
-
-    #dhe_points
-    print("DHE Points:")
-    #print("[", end = "")
-    for i in range (0, len(transaction_pool)):
-        print(hex(transaction_pool[i][1]), end = "")
-        if (i < (len(transaction_pool)-1)):
-            print(",")
-        else:
-            print()
-
-    #values
-    if (stealth_addr != None):
-        print("Values:")
-        #print("[", end = "")
-        for i in range (0, len(transaction_pool)):
-            stealth_tx = StealthTransaction(ExpandPoint(transaction_pool[i][0]), #pub_key compressed
-                                            ExpandPoint(transaction_pool[i][1]), #dhe_point compressed
-                                            ExpandPoint(transaction_pool[i][2]), #c_value compressed
-                                            PCAESMessage(int_to_bytes64(transaction_pool[i][3]),  #pc_encrypted_data.message
-                                                         int_to_bytes16(transaction_pool[i][4]))) #pc_encrypted_data.iv
-
-            data = stealth_tx.DecryptData(stealth_addr[1])
-            print(int(data[0]), end = "")
-            
-            if (i < (len(transaction_pool)-1)):
-                print(",")
-            else:
-                print()
-    else:
-        print("C Values:")
-        #print("[", end = "")
-        for i in range (0, len(transaction_pool)):
-            print(hex(transaction_pool[i][2]), end = "")
-            
-            if (i < (len(transaction_pool)-1)):
-                print(",")
-            else:
-                print()
-
-    print()
-
-def RingCTTokenTestImport(stealth_addr, transaction_pool):
-    rct = RingCTToken()
-    rct.debugPrintingEnabled = False
-    
-    print("Setting Stealth Address...")
-    rct.SetStealthAddress(stealth_addr[0], stealth_addr[1])
-
-    print("Importing " + str(len(transaction_pool)) + " transactions...")
-    for i in range(0, len(transaction_pool)):
-        stealth_tx = StealthTransaction(ExpandPoint(transaction_pool[i][0]), #pub_key compressed
-                                        ExpandPoint(transaction_pool[i][1]), #dhe_point compressed
-                                        ExpandPoint(transaction_pool[i][2]), #c_value compressed
-                                        PCAESMessage(int_to_bytes64(transaction_pool[i][3]),  #pc_encrypted_data.message
-                                                     int_to_bytes16(transaction_pool[i][4]))) #pc_encrypted_data.iv
-        rct.AddTx(stealth_tx)
-
-    print("..." + str(len(rct.MyUTXOPool)) + " UTXOs and " + str(len(rct.MixinTxPool)) + " Mixin Transactions imported")
-    
-    return rct
-
-def RingCTTokenTest(total_value=(10**17), input_count = 3, mixin_count = 3, output_count = 2):
-    rct = RingCTToken()
-    rct.debugPrintingEnabled = False
-    
-    #print("Generating Initial Stealth Address...")
-    #rct.GenerateNewStealthAddress()
-    rct.SetStealthAddress(StealthAddressExport[0], StealthAddressExport[1])
-
-    print("Generating Input Transactions for TX0...")
-    value = [total_value // input_count] * input_count
-    value[-1] = value[-1] + (total_value % input_count)
-    rct.GenerateUTXOs(value, [0]*input_count)
-
-    print("Generating Mixin Transactions for TX0...")
-    rct.GenerateMixinAddresses(input_count*mixin_count)
-
-    print("Generating Output Transactions for TX0...")
-    value = [total_value // output_count] * output_count
-    value[-1] = value[-1] + (total_value % output_count)
-    rct.GeneratePendingUTXOs(value, getRandom(output_count))
-
-    rct.PrintUTXOPool()
-    rct.PrintMixinPool()
-    rct.PrintPendingUTXOPool()
-
-    rct.debugPrintingEnabled = True
-    rct.MintPendingUTXOs([0,1])
-
-    rct.ExportStealthAddress()
-    rct.ExportUTXOPool()
-    rct.ExportMixinPool()
-
-    return rct
-
-#rct = RingCTTokenTest()
-rct = RingCTTokenTestImport(StealthAddressExport, UTXOPoolExport + MixinPoolExport)
-PrintTxExportAsDeposit(UTXOPoolExport + MixinPoolExport, StealthAddressExport)
-rct.SpendTx([1,5])

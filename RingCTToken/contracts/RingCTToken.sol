@@ -152,7 +152,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
     //Constructs full MLSAG for Ring CT Transaction and Verifes
     //Mainly used internally, but can be used to check a transaction off chain before sending
 	function ValidateRingCTTx(  address redeem_eth_address, uint256 redeem_value, uint256 redeem_blinding_factor,
-								uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
+	                            uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
 								uint256[] I, uint256[] input_pub_keys, uint256[] signature)
 		public constant requireECMath requireMLSAGVerify returns (bool)
 	{
@@ -199,7 +199,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
         }
 		
 		//Withdrawal only
-		if (redeem_eth_address != 0 && redeem_value != 0) {
+		if (redeem_value > 0) {
 			//Add unmasked value as a commitment
 			v.point1 = ecMath.CommitG1H(redeem_blinding_factor, redeem_value);
 			v.keyImage = ecMath.Add(v.keyImage, v.point1);
@@ -250,11 +250,11 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 		P = AddColumnsToArray(input_pub_keys, (2*v.m), P, 2);
         
         //Verify ring signature (MLSAG)
-		if (redeem_eth_address == 0 || redeem_value == 0)
-			return mlsagVerify.VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature);
-		else
+		if (redeem_value > 0)
 			return mlsagVerify.VerifyMLSAG(HashWithdrawMsg(redeem_eth_address, redeem_value, redeem_blinding_factor, dest_pub_keys, values, dest_dhe_points), I, P, signature);
-
+        else
+            return mlsagVerify.VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature);
+        
 		return true;
 	}
 	
@@ -323,7 +323,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
     {
 		//Check Ring CT Tx for Validity
         if (!ValidateRingCTTx(	0, 0, 0,
-								dest_pub_keys, values, dest_dhe_points, encrypted_data,
+                                dest_pub_keys, values, dest_dhe_points, encrypted_data,
 								I, input_pub_keys, signature)) return false;
 		
 		//Spend UTXOs and generate new UTXOs					
@@ -352,7 +352,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
     {		
 		//Check Ring CT Tx for Validity
         if (!ValidateRingCTTx(	redeem_eth_address, redeem_value, redeem_blinding_factor,
-								dest_pub_keys, values, dest_dhe_points, encrypted_data,
+                                dest_pub_keys, values, dest_dhe_points, encrypted_data,
 								I, input_pub_keys, signature)) return false;
 								
 		//Spend UTXOs and generate new UTXOs					
@@ -367,7 +367,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 		return true;
     }
 	
-    //CT Functions
+    //CT Function(s)
     //PCProvePositive
     //total_commit = uncompressed EC Point for total hidden value (pederen commitment)
     //power10 = additional scalar to be applied to bitwise commitments (public information)
@@ -391,10 +391,10 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
         uint256 bits = (bit_commits.length / 2);
         if (bits == 0) return false;
         
-        //Check that maximum committed value cannot be negative (over NCurve / 2)
-        if (power10 > 75) return false;
-        if (offset > (ecMath.GetNCurve() / 2)) return false;
-        if (((4**bits-1)*(10**power10) + offset) > (ecMath.GetNCurve() / 2)) return false;
+        //Impose limits on inputs in order to avoid values greater than Ncurve // 2
+        if (power10 > 35) return false;
+        if (offset > (ecMath.GetNCurve() / 4)) return false;
+        if (bits > 64) return false;
         
         //Check for proper signature size
         if (signature.length != (4*bits+1)) return false;

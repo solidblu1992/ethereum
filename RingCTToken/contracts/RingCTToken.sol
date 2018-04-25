@@ -55,9 +55,10 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 	);
 	
 	event PCRangeProven(
-	    uint256 _power10,
-	    uint256 _offset,
-	    uint256 _commitment
+	    uint256 _commitment,
+	    uint256 _min,
+	    uint256 _max,
+	    uint256 _resolution
 	);
 	
 	//Mapping of uint256 index (0...pub_key_count-1) to known public keys (for finding mix in keys)
@@ -88,7 +89,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 	//Deposit Ether as CT tokens to the specified alt_bn_128 public key
 	//NOTE: this deposited amount will NOT be confidential, initial blinding factor = 0
 	function Deposit(uint256 dest_pub_key, uint256 dhe_point)
-    	payable public
+    	payable requireECMath public
 	{
     	//Incoming Value must be non-zero
     	require(msg.value > 0);
@@ -112,7 +113,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 	//This function allows multiple deposits at onces
 	//NOTE: this deposited amount will NOT be confidential, initial blinding factor = 0
 	function DepositMultiple(uint256[] dest_pub_keys, uint256[] dhe_points, uint256[] values)
-	    payable public
+	    payable requireECMath public
     {
         //Incoming Value must be non-zero
         require(msg.value > 0);
@@ -148,6 +149,149 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
     	totalSupply += msg.value;
     }
     
+    //Constructs full MLSAG for Ring CT Transaction and Verifes
+    //Mainly used internally, but can be used to check a transaction off chain before sending
+	function ValidateRingCTTx(  address redeem_eth_address, uint256 redeem_value, uint256 redeem_blinding_factor,
+								uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
+								uint256[] I, uint256[] input_pub_keys, uint256[] signature)
+		public constant requireECMath requireMLSAGVerify returns (bool)
+	{
+		//Need at least one destination
+        if (dest_pub_keys.length == 0) return false;
+        if (dest_pub_keys.length % 2 != 0) return false;
+        
+        //Need same number of values and dhe points
+        if (values.length != dest_pub_keys.length) return false;
+        if (dest_dhe_points.length != dest_pub_keys.length) return false;
+		if (encrypted_data.length != ((dest_pub_keys.length/2)*3)) return false;
+        
+        //Check other array lengths
+        if (I.length % 2 != 0) return false;
+        
+        MLSAGVariables memory v;
+        v.m = (I.length / 2);
+		
+		if (v.m < 2) return false;
+		v.m = v.m - 1;
+        
+        if (input_pub_keys.length % (2*v.m) != 0) return false;
+        v.n = input_pub_keys.length / (2*v.m);
+        
+        //Verify output commitments have been proven positive
+        for (v.i = 0; v.i < (values.length / 2); v.i++) {
+            v.point1 = [values[2*v.i], values[2*v.i+1]];
+            if (!balance_positive[ecMath.CompressPoint(v.point1)]) return false;
+        }
+		
+		//Verify key images are unused
+        for (v.i = 0; v.i < (v.m+1); v.i++) {
+            v.keyImage[0] = ecMath.CompressPoint([I[2*v.i], I[2*v.i+1]]);
+            if (key_images[v.keyImage[0]]) return false;
+        }
+		
+        
+		//Create last two columns of MLSAG public key set (sigma{input_pub_keys} + sigma{input_commitments} - sigma{output_commitments}
+		//Calculate negative of total destination commitment
+		//Note, here keyImage is used, but this is just because another EC point in memory is needed (not an actual key image)
+        v.keyImage = [values[0], values[1]];
+        for (v.i = 1; v.i < (values.length / 2); v.i++) {
+            v.keyImage = ecMath.Add(v.keyImage, [values[2*v.i], values[2*v.i+1]]);
+        }
+		
+		//Withdrawal only
+		if (redeem_eth_address != 0 && redeem_value != 0) {
+			//Add unmasked value as a commitment
+			v.point1 = ecMath.CommitG1H(redeem_blinding_factor, redeem_value);
+			v.keyImage = ecMath.Add(v.keyImage, v.point1);
+			v.keyImage = ecMath.Negate(v.keyImage);
+		}
+		
+        v.keyImage = ecMath.Negate(v.keyImage);
+		
+        uint256[] memory P = new uint256[](2*v.n);
+		for (v.i = 0; v.i < v.n; v.i++) {
+			//Sum input public keys and their commitments			
+			for (v.j = 0; v.j < v.m; v.j++) {
+				v.index = 2*(v.m*v.i+v.j);
+				v.point1 = [input_pub_keys[v.index], input_pub_keys[v.index+1]];
+				v.point2[0] = ecMath.CompressPoint(v.point1);
+				v.point2[0] = token_committed_balance[v.point2[0]];
+				if (v.point2[0] == 0) return false; //No commitment found!
+				
+				v.point2 = ecMath.ExpandPoint(v.point2[0]);
+				
+				if (v.j == 0) {
+					v.point3 = ecMath.Add(v.point1, v.point2);
+				}
+				else {
+					v.point3 = ecMath.Add(v.point3, v.point1);
+					v.point3 = ecMath.Add(v.point3, v.point2);
+				}
+			}
+			
+			//Add negated output commitments
+			v.point3 = ecMath.Add(v.point3, v.keyImage);
+			
+			//Store point 3 into P
+			(P[2*v.i], P[2*v.i+1]) = (v.point3[0], v.point3[1]);
+		}
+		
+        //Combine original public key set with new summations
+		//Note: this resizes P from (2*v.n) to (2*v.n*(v.m+1))
+		//P(before) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my,
+		//					P21x, P21y, P22x, P22y, ..., P2mx, P2my,
+		//					...
+		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy	}
+		//
+		//P(after) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my, sigma(P1j) + sigma(C1j) - sigma(Ciout),
+		//					P21x, P21y, P22x, P22y, ..., P2mx, P2my, sigma(P2j) + sigma(C2j) - sigma(Ciout),
+		//					...
+		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy, sigma(Pnj) + sigma(Pnj) - sigma(Ciout)	}
+		P = AddColumnsToArray(input_pub_keys, (2*v.m), P, 2);
+        
+        //Verify ring signature (MLSAG)
+		if (redeem_eth_address == 0 || redeem_value == 0)
+			return mlsagVerify.VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature);
+		else
+			return mlsagVerify.VerifyMLSAG(HashWithdrawMsg(redeem_eth_address, redeem_value, redeem_blinding_factor, dest_pub_keys, values, dest_dhe_points), I, P, signature);
+
+		return true;
+	}
+	
+	//Marks UTXOs as spent by storing the key images and creates new UTXOs
+	//Internal function only
+	function ProcessRingCTTx(uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data, uint256[] I)
+	    internal requireECMath requireMLSAGVerify returns (bool)
+	{
+	    MLSAGVariables memory v;
+    
+        //Store key images (point of no return, all returns need to be reverts after this point)
+        for (v.i = 0; v.i < (I.length / 2); v.i++) {
+            v.point1 = [I[2*v.i], I[2*v.i+1]];
+            key_images[ecMath.CompressPoint(v.point1)] = true;
+        }
+		
+		//Generate new UTXO's
+		for (v.i = 0; v.i < (dest_pub_keys.length / 2); v.i++) {
+			v.index = 2*v.i;
+			v.point1 = [dest_pub_keys[v.index], dest_pub_keys[v.index+1]];
+			v.point1[0] = ecMath.CompressPoint(v.point1);
+			
+			v.point2 = [values[v.index], values[v.index+1]];
+			v.point2[0] = ecMath.CompressPoint(v.point2);
+			
+			v.point3 = [dest_dhe_points[v.index], dest_dhe_points[v.index+1]];
+			v.point3[0] = ecMath.CompressPoint(v.point3);
+			
+			token_committed_balance[v.point1[0]] = v.point2[0];	//Store output commitment			
+			pub_keys_by_index[pub_key_count] = v.point1[0];		//Store public key
+			pub_key_count++;
+
+			//Log new stealth transaction
+			emit NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
+		}
+	}
+	
     //Send - sends tokens via the Ring CT protocol
 	//Verifies an MLSAG ring signature over a set of public keys and the summation of their commitments and a set of output commitments.
 	//If successful, a new set of public keys (UTXO's) will be generated with masked values (pedersen commitments).  Each of these
@@ -175,119 +319,15 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 	//Note 2: See https://eprint.iacr.org/2015/1098 for more details on RingCT
     function Send(  uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
                     uint256[] I, uint256[] input_pub_keys, uint256[] signature)
-        public returns (bool success)
+        public requireECMath requireMLSAGVerify returns (bool success)
     {
-        //Need at least one destination
-        if (dest_pub_keys.length == 0) return false;
-        if (dest_pub_keys.length % 2 != 0) return false;
-        
-        //Need same number of values and dhe points
-        if (values.length != dest_pub_keys.length) return false;
-        if (dest_dhe_points.length != dest_pub_keys.length) return false;
-		if (encrypted_data.length != ((dest_pub_keys.length/2)*3)) return false;
-        
-        //Check other array lengths
-        if (I.length % 2 != 0) return false;
-        
-        MLSAGVariables memory v;
-        v.m = (I.length / 2);
+		//Check Ring CT Tx for Validity
+        if (!ValidateRingCTTx(	0, 0, 0,
+								dest_pub_keys, values, dest_dhe_points, encrypted_data,
+								I, input_pub_keys, signature)) return false;
 		
-		if (v.m < 2) return false;
-		v.m = v.m - 1;
-        
-        if (input_pub_keys.length % (2*v.m) != 0) return false;
-        v.n = input_pub_keys.length / (2*v.m);
-        
-        //Verify output commitments have been proven positive
-        for (v.i = 0; v.i < (values.length / 2); v.i++) {
-            v.point1 = [values[2*v.i], values[2*v.i+1]];
-            if (!balance_positive[ecMath.CompressPoint(v.point1)]) return false;
-        }
-		
-		//Verify key images are unused
-        for (v.i = 0; v.i < (v.m+1); v.i++) {
-            v.keyImage[0] = ecMath.CompressPoint([I[2*v.i], I[2*v.i+1]]);
-            if (key_images[v.keyImage[0]]) return false;
-        }
-        
-		//Create last two columns of MLSAG public key set (sigma{input_pub_keys} + sigma{input_commitments} - sigma{output_commitments}
-		//Calculate negative of total destination commitment
-		//Note, here keyImage is used, but this is just because another EC point in memory is needed (not an actual key image)
-        v.keyImage = [values[0], values[1]];
-        for (v.i = 1; v.i < (values.length / 2); v.i++) {
-            v.keyImage = ecMath.Add(v.keyImage, [values[2*v.i], values[2*v.i+1]]);
-        }
-        v.keyImage = ecMath.Negate(v.keyImage);
-		
-        uint256[] memory P = new uint256[](2*v.n);
-		for (v.i = 0; v.i < v.n; v.i++) {
-			//Sum input public keys and their commitments			
-			for (v.j = 0; v.j < v.m; v.j++) {
-				v.index = 2*(v.m*v.i+v.j);
-				v.point1 = [input_pub_keys[v.index], input_pub_keys[v.index+1]];
-				v.point2[0] = ecMath.CompressPoint(v.point1);
-				v.point2[0] = token_committed_balance[v.point2[0]];
-				if (v.point2[0] == 0) return false; //No commitment found!
-				
-				v.point2 = ecMath.ExpandPoint(v.point2[0]);
-				
-				if (v.j == 0) {
-					v.point3 = ecMath.Add(v.point1, v.point2);
-				}
-				else {
-					v.point3 = ecMath.Add(v.point3, v.point1);
-					v.point3 = ecMath.Add(v.point3, v.point2);
-				}
-			}
-			
-			//Add negated output commitments
-			v.point3 = ecMath.Add(v.point3, v.keyImage);
-			
-			//Store point 3 into P
-			(P[2*v.i], P[2*v.i+1]) = (v.point3[0], v.point3[1]);
-		}
-		
-        //Combine original public key set with new summations
-		//Note: this resizes P from (2*v.n) to (2*v.n*(v.m+1))
-		//P(before) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my,
-		//					P21x, P21y, P22x, P22y, ..., P2mx, P2my,
-		//					...
-		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy	}
-		//
-		//P(after) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my, sigma(P1j) + sigma(C1j) - sigma(Ciout),
-		//					P21x, P21y, P22x, P22y, ..., P2mx, P2my, sigma(P2j) + sigma(C2j) - sigma(Ciout),
-		//					...
-		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy, sigma(Pnj) + sigma(Pnj) - sigma(Ciout)	}
-		P = AddColumnsToArray(input_pub_keys, (2*v.m), P, 2);
-        
-        //Verify ring signature (MLSAG)
-        if (!mlsagVerify.VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature)) return false;
-    
-        //Store key images (point of no return, all returns need to be reverts after this point)
-        for (v.i = 0; v.i < (I.length / 2); v.i++) {
-            v.point1 = [I[2*v.i], I[2*v.i+1]];
-            key_images[ecMath.CompressPoint(v.point1)] = true;
-        }
-		
-		//Generate new UTXO's
-		for (v.i = 0; v.i < (dest_pub_keys.length / 2); v.i++) {
-			v.index = 2*v.i;
-			v.point1 = [dest_pub_keys[v.index], dest_pub_keys[v.index+1]];
-			v.point1[0] = ecMath.CompressPoint(v.point1);
-			
-			v.point2 = [values[v.index], values[v.index+1]];
-			v.point2[0] = ecMath.CompressPoint(v.point2);
-			
-			v.point3 = [dest_dhe_points[v.index], dest_dhe_points[v.index+1]];
-			v.point3[0] = ecMath.CompressPoint(v.point3);
-			
-			token_committed_balance[v.point1[0]] = v.point2[0];	//Store output commitment			
-			pub_keys_by_index[pub_key_count] = v.point1[0];		//Store public key
-			pub_key_count++;
-
-			//Log new stealth transaction
-			emit NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
-		}
+		//Spend UTXOs and generate new UTXOs					
+		ProcessRingCTTx(dest_pub_keys, values, dest_dhe_points, encrypted_data, I);
 		
 		return true;
     }
@@ -308,131 +348,17 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
     function Withdraw(  address redeem_eth_address, uint256 redeem_value, uint256 redeem_blinding_factor,
 						uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
 						uint256[] I, uint256[] input_pub_keys, uint256[] signature)
-        public returns (bool success)
-    {
-        //Need at least one destination
-        if (dest_pub_keys.length == 0) return false;
-        if (dest_pub_keys.length % 2 != 0) return false;
-        
-        //Need same number of values and dhe points
-        if (values.length != dest_pub_keys.length) return false;
-        if (dest_dhe_points.length != dest_pub_keys.length) return false;
-		if (encrypted_data.length != ((dest_pub_keys.length/2)*3)) return false;
-        
-        //Check other array lengths
-        if (I.length % 2 != 0) return false;
-        
-        MLSAGVariables memory v;
-        v.m = (I.length / 2);
+        public requireECMath requireMLSAGVerify returns (bool success)
+    {		
+		//Check Ring CT Tx for Validity
+        if (!ValidateRingCTTx(	redeem_eth_address, redeem_value, redeem_blinding_factor,
+								dest_pub_keys, values, dest_dhe_points, encrypted_data,
+								I, input_pub_keys, signature)) return false;
+								
+		//Spend UTXOs and generate new UTXOs					
+		ProcessRingCTTx(dest_pub_keys, values, dest_dhe_points, encrypted_data, I);
 		
-		if (v.m < 2) return false;
-		v.m = v.m - 1;
-        
-        if (input_pub_keys.length % (2*v.m) != 0) return false;
-        v.n = input_pub_keys.length / (2*v.m);
-        
-        //Verify key images are unused
-        for (v.i = 0; v.i < (v.m+1); v.i++) {
-            v.keyImage[0] = ecMath.CompressPoint([I[2*v.i], I[2*v.i+1]]);
-            if (key_images[v.keyImage[0]]) return false;
-        }
-        
-        //Verify output commitments have been proven positive
-        for (v.i = 0; v.i < (values.length / 2); v.i++) {
-            v.point1 = [values[2*v.i], values[2*v.i+1]];
-            if (!balance_positive[ecMath.CompressPoint(v.point1)]) return false;
-        }
-		
-		//Verify key images are unused
-        for (v.i = 0; v.i < v.m; v.i++) {
-            v.keyImage[0] = ecMath.CompressPoint([I[2*v.i], I[2*v.i+1]]);
-            if (key_images[v.keyImage[0]]) return false;
-        }
-        
-		//Create last two columns of MLSAG public key set (sigma{input_pub_keys} + sigma{input_commitments} - sigma{output_commitments  + redeem_commitment}
-		//Calculate negative of total destination commitment
-		//Note, here keyImage is used, but this is just because another EC point in memory is needed (not an actual key image)
-        v.keyImage = [values[0], values[1]];
-        for (v.i = 1; v.i < (values.length / 2); v.i++) {
-            v.keyImage = ecMath.Add(v.keyImage, [values[2*v.i], values[2*v.i+1]]);
-        }
-		
-		//Add unmasked value as a commitment
-		v.point1 = ecMath.CommitG1H(redeem_blinding_factor, redeem_value);
-		v.keyImage = ecMath.Add(v.keyImage, v.point1);
-        v.keyImage = ecMath.Negate(v.keyImage);
-        
-        uint256[] memory P = new uint256[](2*v.n);
-		for (v.i = 0; v.i < v.n; v.i++) {
-			//Sum input public keys and their commitments			
-			for (v.j = 0; v.j < v.m; v.j++) {
-				v.index = 2*(v.m*v.i+v.j);
-				v.point1 = [input_pub_keys[v.index], input_pub_keys[v.index+1]];
-				v.point2[0] = ecMath.CompressPoint(v.point1);
-				v.point2[0] = token_committed_balance[v.point2[0]];
-				if (v.point2[0] == 0) return false; //No commitment found!
-				
-				v.point2 = ecMath.ExpandPoint(v.point2[0]);
-				
-				if (v.j == 0) {
-					v.point3 = ecMath.Add(v.point1, v.point2);
-				}
-				else {
-					v.point3 = ecMath.Add(v.point3, v.point1);
-					v.point3 = ecMath.Add(v.point3, v.point2);
-				}
-			}
-			
-			//Add negated output commitments
-			v.point3 = ecMath.Add(v.point3, v.keyImage);
-			
-			//Store point 3 into P
-			(P[2*v.i], P[2*v.i+1]) = (v.point3[0], v.point3[1]);
-		}
-		
-        //Combine original public key set with new summations
-		//Note: this resizes P from (2*v.n) to (2*v.n*(v.m+1))
-		//P(before) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my,
-		//					P21x, P21y, P22x, P22y, ..., P2mx, P2my,
-		//					...
-		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy	}
-		//
-		//P(after) =	{	P11x, P11y, P12x, P12y, ..., P1mx, P1my, sigma(P1j) + sigma(C1j) - sigma(Ciout),
-		//					P21x, P21y, P22x, P22y, ..., P2mx, P2my, sigma(P2j) + sigma(C2j) - sigma(Ciout),
-		//					...
-		//					Pn1x, Pn1y, Pn2x, Pn2y, ..., Pnmx, Pnmy, sigma(Pnj) + sigma(Pnj) - sigma(Ciout)	}
-		P = AddColumnsToArray(input_pub_keys, (2*v.m), P, 2);
-        
-        //Verify ring signature (MLSAG)
-        if (!mlsagVerify.VerifyMLSAG(HashWithdrawMsg(redeem_eth_address, redeem_value, redeem_blinding_factor, dest_pub_keys, values, dest_dhe_points), I, P, signature)) return false;
-    
-        //Store key images (point of no return, all returns need to be reverts after this point)
-        for (v.i = 0; v.i < (I.length / 2); v.i++) {
-            v.point1 = [I[2*v.i], I[2*v.i+1]];
-            key_images[ecMath.CompressPoint(v.point1)] = true;
-        }
-		
-		//Generate new UTXO's
-		for (v.i = 0; v.i < (dest_pub_keys.length / 2); v.i++) {
-			v.index = 2*v.i;
-			v.point1 = [dest_pub_keys[v.index], dest_pub_keys[v.index+1]];
-			v.point1[0] = ecMath.CompressPoint(v.point1);
-			
-			v.point2 = [values[v.index], values[v.index+1]];
-			v.point2[0] = ecMath.CompressPoint(v.point2);
-			
-			v.point3 = [dest_dhe_points[v.index], dest_dhe_points[v.index+1]];
-			v.point3[0] = ecMath.CompressPoint(v.point3);
-			
-			token_committed_balance[v.point1[0]] = v.point2[0];	//Store output commitment			
-			pub_keys_by_index[pub_key_count] = v.point1[0];		//Store public key
-			pub_key_count++;
-			
-			//Log new stealth transaction
-			emit NewStealthTx(v.point1[0], v.point3[0], [encrypted_data[3*v.i], encrypted_data[3*v.i+1], encrypted_data[3*v.i+2]]);
-		}
-		
-		//Send redeemed value
+		//Send redeemed value to ETH address
 		redeem_eth_address.transfer(redeem_value);
 		
 		//Log Withdrawal
@@ -518,7 +444,9 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
         
         if (success) {
             balance_positive[total_commit[0]] = true;
-            emit PCRangeProven(power10, offset, total_commit[0]);
+            temp1[0] = (4**bits-1)*(10**power10)+offset;    //Max value
+            temp1[1] = (10**power10);                       //Resolution
+            emit PCRangeProven(total_commit[0], offset, temp1[0], temp1[1]);
         }
     }
     

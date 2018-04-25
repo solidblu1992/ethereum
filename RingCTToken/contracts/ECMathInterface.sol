@@ -89,6 +89,6 @@ contract ECMathInterface is Debuggable {
 	
 	//Contstructor Function - Initializes Prerequisite Contract(s)
 	constructor() public {
-	    ECMath_ChangeAddress(0xf18e5d7Ed6ec5a8b30715D4424E0DA277132Fa1A);
+	    ECMath_ChangeAddress(0x47346DF43dC7a2b821C7d5cd871E8A0edc38F37d);
 	}
 }

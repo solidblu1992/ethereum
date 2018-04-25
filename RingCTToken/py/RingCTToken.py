@@ -407,6 +407,7 @@ def RingCTTokenTest(total_value=(10**17), input_count = 3, mixin_count = 3, outp
     
     #print("Generating Initial Stealth Address...")
     #rct.GenerateNewStealthAddress()
+    rct.SetStealthAddress(StealthAddressExport[0], StealthAddressExport[1])
 
     print("Generating Input Transactions for TX0...")
     value = [total_value // input_count] * input_count
@@ -436,5 +437,5 @@ def RingCTTokenTest(total_value=(10**17), input_count = 3, mixin_count = 3, outp
 
 #rct = RingCTTokenTest()
 rct = RingCTTokenTestImport(StealthAddressExport, UTXOPoolExport + MixinPoolExport)
-
-
+PrintTxExportAsDeposit(UTXOPoolExport + MixinPoolExport, StealthAddressExport)
+rct.SpendTx([1,5])

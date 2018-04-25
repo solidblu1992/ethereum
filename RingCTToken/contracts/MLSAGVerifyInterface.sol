@@ -145,13 +145,13 @@ contract MLSAGVerifyInterface is Debuggable {
 		emit ContractAddressChanged("MLSAGVerify", mlsagVerifyAddr);
 	}
 	
-	modifier requireECMath {
+	modifier requireMLSAGVerify {
 	    require(MLSAGVerify_GetCodeSize() > 0);
 	    _;
 	}
 
 	//Contstructor Function - Initializes Prerequisite Contract(s)
 	constructor() public {
-	    //MLSAGVerify_ChangeAddress(0x16FaA093E9d161D81FcB53a179F807d129ECf112);
+	    MLSAGVerify_ChangeAddress(0x132036A121928A8E5837c9d47AF6c094FF9CcfB8);
 	}
 }

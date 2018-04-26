@@ -293,8 +293,111 @@ class RingCTToken:
         print("Send Tx Data")
         print("============================================")
         sig.Print_MEW()
-        return sig
+        return (out_rp, sig)
+
+    def WithdrawTx(self, redeem_eth_address, redeem_eth_value, UTXOindices, mixins=2, output_values=None, pubViewKey=None, pubSpendKey=None):
+        UTXOindices = list(set(UTXOindices)) #remove duplicates
+        mixin_count = len(UTXOindices)*mixins
+        assert((len(self.MixinTxPool)+len(self.MyUTXOPool)-len(UTXOindices)) >= mixin_count) #Must have enough mixin transactions to perform Tx
+        assert((redeem_eth_value > 0) and (redeem_eth_value < (Ncurve // 2)))
+
+        print("Generating Spend Tx...")
+
+        #Get Private Keys, values, and blinding factors from UTXO set
+        in_utxos = []
+        in_values = [0] * len(UTXOindices)
+        in_bfs = [0] * len(UTXOindices)
+        in_xk = [0] * len(UTXOindices)
+        for i in range(0, len(UTXOindices)):
+            in_utxos = in_utxos + [self.MyUTXOPool[UTXOindices[i]]]
+            (in_values[i], in_bfs[i]) = in_utxos[i].DecryptData(self.MyPrivateSpendKey)
+            in_xk[i] = in_utxos[i].GetPrivKey(self.MyPrivateViewKey, self.MyPrivateSpendKey)
+
+        #Pick random mixin transactions from spent utxos, unknown utxos, and unspent utxos
+        rem_utxo_indices = list(set(range(0, len(self.MyUTXOPool))) - set(UTXOindices))
+            
+        mixin_tx = []
+        while (len(mixin_tx) != mixin_count):
+            mixin_tx = mixin_tx + [getRandom() % (len(self.MixinTxPool) + len(rem_utxo_indices))]
+            mixin_tx = list(set(mixin_tx))
+
+        for i in range(0, mixin_count):
+            index = mixin_tx[i]
+
+            if (index < len(self.MixinTxPool)):
+                mixin_tx[i] = self.MixinTxPool[mixin_tx[i]]
+            else:
+                index = index - len(self.MixinTxPool)
+                mixin_tx[i] = self.MyUTXOPool[rem_utxo_indices[index]]
+
+        #Generate output transactions
+        total_out_value = 0
+        for i in range(0, len(in_values)):
+            total_out_value = total_out_value + in_values[i]
+
+        assert(total_out_value >= redeem_eth_value)
+        total_out_value = total_out_value - redeem_eth_value
+
+        if ((pubViewKey == None) or (pubSpendKey == None)):
+            pubViewKey = self.MyPublicViewKey
+            pubSpendKey = self.MyPublicSpendKey
+
+        #None = one output of total value
+        if (output_values == None):
+            output_values = [total_out_value]
+        #Int = output count stored instead
+        elif (output_values != list):
+            v = total_out_value // output_values
+            rem = total_out_value - (v*output_values)
+            output_values = [v]*output_values
+            output_values[-1] = output_values[-1] + rem
+        #List = output values specified, create that number of outputs or add extra to account for unspent remainder
+        else:
+            sum_output_values = 0
+            for i in range(0, len(output_values)):
+                sum_output_values = sum_output_values + output_values[i]
+
+            #Check to see if enough tokens are avalable in the specified UTXO set
+            assert(sum_output_values <= total_out_value)
+
+            #If sum is less than avaiable tokens but not exactly equal, add remaining output value
+            if (sum_output_values != total_out_value):
+                output_values = output_values + [total_out_value - sum_output_values]
+
+        #Generate Pedersen Commitments
+        out_tx = []
+        out_rp = []
+        out_bf = []
+        for i in range(0, len(output_values)):
+            (out_rp_val, out_rp_pow10, out_rp_rem, out_rp_bits) = PCRangeProof.GenerateParameters(output_values[i], 4)
+            out_bf = out_bf + [getRandom()]
+            out_rp = out_rp + [PCRangeProof.Generate(out_rp_val, out_rp_pow10, out_rp_rem, 3, out_bf[i])]
+            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKey, pubSpendKey, output_values[i], out_bf[i])]
+            
+        sig = RingCT.Sign(in_xk, in_values, in_bfs, mixin_tx, out_tx, output_values, out_bf, redeem_eth_address, redeem_eth_value)
+        self.MyPendingUTXOPool = self.MyPendingUTXOPool + out_tx
+
+        #Print Information about Transaction
+        print("total output value: " + str(total_out_value+redeem_eth_value))
+
+        #Print PC Range Proof Data
+        print("============================================")
+        print("PC Range Proof Data")
+        print("============================================")
+
+        for i in range(0, len(output_values)):
+            print("--------------------------------------------")
+            print("Range Proof " + str(i+1) + " of " + str(len(output_values)))
+            print("Hidden Value = " + str(output_values[i]) + " wei or " + str(output_values[i] / 10**18) + " ETH")
+            print("--------------------------------------------")
+            out_rp[i].Print_MEW()
         
+        #Print Send Data
+        print("============================================")
+        print("Send Tx Data")
+        print("============================================")
+        sig.Print_MEW()
+        return (out_rp, sig)
 
     def PrintStealthAddress(self):
         print("Public View Key:  " + print_point(CompressPoint(self.MyPublicViewKey)))

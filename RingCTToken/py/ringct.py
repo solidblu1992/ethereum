@@ -19,17 +19,23 @@ class RingCT:
     input_commitments = []
     output_transactions = []
     mlsag = 0
+    redeem_eth_address = 0
+    redeem_eth_value = 0
     
     def __init__(self, ring_size, input_count, input_commitments,
-                 output_transactions, mlsag):
+                 output_transactions, mlsag,
+                 redeem_eth_address=0, redeem_eth_value=0):
         self.ring_size = ring_size
         self.input_count = input_count
         self.input_commitments = input_commitments
         self.output_transactions = output_transactions
         self.mlsag = mlsag
+        self.redeem_eth_address = redeem_eth_address
+        self.redeem_eth_value = redeem_eth_value
 
     def Sign(xk, xk_v, xk_bf, mixin_transactions,
-             output_transactions, out_v, out_bf):
+             output_transactions, out_v, out_bf,
+             redeem_eth_address=0, redeem_eth_value=0):
         import random
 
         #Check array dimensions
@@ -38,6 +44,7 @@ class RingCT:
         assert(len(xk) == input_count)
         assert(len(xk_v) == input_count)
         assert(len(xk_bf) == input_count)
+        assert(redeem_eth_value < (Ncurve // 2))
         
         m = input_count + 1
         assert(len(mixin_transactions) % input_count == 0)
@@ -68,6 +75,9 @@ class RingCT:
             total_out_bf = (total_out_bf + out_bf[i]) % Ncurve
 
         z = (total_in_bf + Ncurve - total_out_bf) % Ncurve
+
+        #Add redeemed token value to out_value, only used in withdrawal signatures
+        out_value = out_value + redeem_eth_value;
 
         assert(in_value == out_value)
         assert(z != 0) #blinding factors must add to a non-zero otherwise privacy is erased!
@@ -125,12 +135,18 @@ class RingCT:
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+
+        #Hash ETH redeem address and value if they are used
+        if (redeem_eth_value > 0):
+            hasher.update(int_to_bytes20(redeem_eth_address))
+            hasher.update(int_to_bytes32(redeem_eth_value))
+        
         for i in range(0, len(subhashes)):
             hasher.update(subhashes[i])
 
         msgHash = hasher.digest()
         neg_total_out_commitment = neg(add(multiply(H, in_value), multiply(G1, total_out_bf)))
-    
+        
         #Sum up last column
         for j in range(0, n):
             #Subtract output commitments
@@ -151,13 +167,15 @@ class RingCT:
         return( RingCT(n, m-1,
                        input_commitments_new,
                        output_transactions,
-                       MLSAG.Sign_GenRandom(m, msgHash, priv_keys, indices, pub_keys)) )
+                       MLSAG.Sign_GenRandom(m, msgHash, priv_keys, indices, pub_keys),
+                       redeem_eth_address, redeem_eth_value))
 
     def Verify(self):
         #Assert array lengths
         if(self.input_count <= 0): return False
         output_count = len(self.output_transactions)
         if(output_count <= 0): return False
+        if(self.redeem_eth_value >= (Ncurve // 2)): return False
         
         n = self.ring_size
         m = self.input_count+1
@@ -167,6 +185,10 @@ class RingCT:
         neg_total_output_commitment = None
         for i in range(0, len(self.output_transactions)):
             neg_total_output_commitment = add(neg_total_output_commitment, self.output_transactions[i].c_value)
+
+        #Add redeem commitment for withdrawal
+        if (self.redeem_eth_value > 0):
+            neg_total_output_commitment  = add(neg_total_output_commitment, multiply(H, self.redeem_eth_value))
 
         #negate it
         neg_total_output_commitment = neg(neg_total_output_commitment)
@@ -212,6 +234,12 @@ class RingCT:
 
         subhashes = subhashes + [hasher.digest()]
         hasher = sha3.keccak_256()
+
+        #Hash ETH redeem address and value if they are used
+        if (redeem_eth_value > 0):
+            hasher.update(int_to_bytes20(redeem_eth_address))
+            hasher.update(int_to_bytes32(redeem_eth_value))
+            
         for i in range(0, len(subhashes)):
             #print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
             hasher.update(subhashes[i])
@@ -242,13 +270,25 @@ class RingCT:
         for i in range(0, len(self.output_transactions)):
             print("Output " + str(i+1))
             print(print_point(CompressPoint(self.output_transactions[i].pub_key)) + ", " + print_point(CompressPoint(self.output_transactions[i].c_value)))
+
+        if (self.redeem_eth_value > 0):
+            print("-----")
+            print("Redeemed ETH Address: " + hex(self.redeem_eth_address))
+            print("Redeemed ETH Value: " + str(self.redeem_eth_value) + " wei or " + str(self.redeem_eth_value / 10**18) + " ETH")
             
     #Prints Ring CT parameters and signature in a format to be verified on the Ethereum blockchain
     def Print_Remix(self):
         output_count = len(self.output_transactions)
         
-        #Print destination public keys
-        print("Ring CT Remix Representation - for use with Send():")
+        #Print Withdrawal information if applicable
+        if (self.redeem_eth_value > 0):
+            print("Ring CT Remix Representation - for use with Withdraw():")
+            print(hex(self.redeem_eth_address))
+            print(str(self.redeem_eth_value))
+        else:
+            print("Ring CT Remix Representation - for use with Send():")
+
+        #Print destination public keys  
         print("[", end="")
         for i in range(0, output_count):
             print("\"" + hex(self.output_transactions[i].pub_key[0].n) + "\",\n\"" + hex(self.output_transactions[i].pub_key[1].n) + "\"", end = "")
@@ -327,10 +367,20 @@ class RingCT:
 
     def Print_MEW(self):
         output_count = len(self.output_transactions)
+
+        #Print Withdrawal information if applicable
+        if (self.redeem_eth_value > 0):
+            print("Ring CT MEW Representation - for use with Send():")
+            print("redeem_eth_address:")
+            print(hex(self.redeem_eth_address))
+                
+            print("\nredeem_eth_value:")
+            print(str(self.redeem_eth_value))
+        else:
+            print("Ring CT Remix Representation - for use with Send():")
         
         #Print destination public keys
-        print("Ring CT MEW Representation - for use with Send():")
-        print("dest_pub_keys:")
+        print("\ndest_pub_keys:")
         for i in range(0, output_count):
             print(hex(self.output_transactions[i].pub_key[0].n) + ",\n" + hex(self.output_transactions[i].pub_key[1].n), end = "")
 

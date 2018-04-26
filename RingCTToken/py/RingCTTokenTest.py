@@ -25,9 +25,8 @@ def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, outp
     rct = RingCTToken()
     rct.debugPrintingEnabled = False
     
-    #print("Generating Initial Stealth Address...")
-    #rct.GenerateNewStealthAddress()
-    rct.SetStealthAddress(StealthAddressExport[0], StealthAddressExport[1])
+    print("Generating Initial Stealth Address...")
+    rct.GenerateNewStealthAddress()
 
     print("Generating Input Transactions for TX0...")
     value = [total_value // input_count] * input_count
@@ -35,17 +34,7 @@ def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, outp
     rct.GenerateUTXOs(value, [0]*input_count)
 
     print("Generating Mixin Transactions for TX0...")
-    #rct.GenerateMixinAddresses(input_count*mixin_count)
     rct.GenerateUTXOs([value[0]]*(input_count*mixin_count), [0]*(input_count*mixin_count))
-
-    #print("Generating Output Transactions for TX0...")
-    #value = [total_value // output_count] * output_count
-    #value[-1] = value[-1] + (total_value % output_count)
-    #rct.GeneratePendingUTXOs(value, getRandom(output_count))
-
-    rct.PrintUTXOPool()
-    #rct.PrintMixinPool()
-    #rct.PrintPendingUTXOPool()
 
     rct.debugPrintingEnabled = True
 
@@ -58,16 +47,16 @@ def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, outp
     else:
         output_values = output_count
         #output_values = [5, 10, 7, ...]
-        
+ 
     tx0 = rct.SendTx(list(range(0,input_count)), mixin_count, output_values)
     rct.MarkUTXOAsSpent(list(range(0,input_count)))
     rct.MintPendingUTXOs(list(range(0,input_count)))
     
-    #tx1 = rct.WithdrawTx([7], mixin_count, None)
+    tx1 = rct.WithdrawTx(0x616837c633c543a6796c34b6607CC3b36e38fFAa, 10**15, [0], mixin_count, None)
     
-    return (rct, tx0)
+    return (rct, tx0, tx1)
 
-(rct, tx0) = RingCTTokenTest()
+(rct, tx0, tx1) = RingCTTokenTest()
 #rct = RingCTTokenTestImport(StealthAddressExport, UTXOPoolExport + MixinPoolExport)
 #PrintTxExportAsDeposit(UTXOPoolExport + MixinPoolExport, StealthAddressExport)
 #sig = rct.SpendTx([1,5])

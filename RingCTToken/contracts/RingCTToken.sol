@@ -151,7 +151,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
     
     //Constructs full MLSAG for Ring CT Transaction and Verifes
     //Mainly used internally, but can be used to check a transaction off chain before sending
-	function ValidateRingCTTx(  address redeem_eth_address, uint256 redeem_value, uint256 redeem_blinding_factor,
+	function ValidateRingCTTx(  address redeem_eth_address, uint256 redeem_eth_value,
 	                            uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
 								uint256[] I, uint256[] input_pub_keys, uint256[] signature)
 		public constant requireECMath requireMLSAGVerify returns (bool)
@@ -199,9 +199,9 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
         }
 		
 		//Withdrawal only
-		if (redeem_value > 0) {
+		if (redeem_eth_value > 0) {
 			//Add unmasked value as a commitment
-			v.point1 = ecMath.CommitG1H(redeem_blinding_factor, redeem_value);
+			v.point1 = ecMath.MultiplyH(redeem_eth_value);
 			v.keyImage = ecMath.Add(v.keyImage, v.point1);
 			v.keyImage = ecMath.Negate(v.keyImage);
 		}
@@ -250,8 +250,8 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 		P = AddColumnsToArray(input_pub_keys, (2*v.m), P, 2);
         
         //Verify ring signature (MLSAG)
-		if (redeem_value > 0)
-			return mlsagVerify.VerifyMLSAG(HashWithdrawMsg(redeem_eth_address, redeem_value, redeem_blinding_factor, dest_pub_keys, values, dest_dhe_points), I, P, signature);
+		if (redeem_eth_value > 0)
+			return mlsagVerify.VerifyMLSAG(HashWithdrawMsg(redeem_eth_address, redeem_eth_value, dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature);
         else
             return mlsagVerify.VerifyMLSAG(HashSendMsg(dest_pub_keys, values, dest_dhe_points, encrypted_data), I, P, signature);
         
@@ -322,7 +322,7 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
         public requireECMath requireMLSAGVerify returns (bool success)
     {
 		//Check Ring CT Tx for Validity
-        if (!ValidateRingCTTx(	0, 0, 0,
+        if (!ValidateRingCTTx(	0, 0,
                                 dest_pub_keys, values, dest_dhe_points, encrypted_data,
 								I, input_pub_keys, signature)) return false;
 		
@@ -339,19 +339,18 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 	//will be destoryed and sent to an ETH address for their ETH value
 	//
 	//redeem_eth_address		= ETH address to send ETH value of redeemed tokens to
-	//redeem_value				= total value masked by UTXO's to redeem
-	//redeem_blinding_factor	= total blinding factor of UTXO's to redeem
+	//redeem_eth_value			= total number of tokens to redeem, the rest is sent (or a commitment to zero) is sent new alt_bn_128 outputs
 	//See Send(...) for other inputs
 	//
 	//Note: Every withdrawal must create at least one new masked UTXO, otherwise the privacy of all spent input public keys are compromised.
 	//		(The network will know which key vector has been spent.)  At a minimum, one new UTXO may be created with a commitment to zero.
-    function Withdraw(  address redeem_eth_address, uint256 redeem_value, uint256 redeem_blinding_factor,
+    function Withdraw(  address redeem_eth_address, uint256 redeem_eth_value,
 						uint256[] dest_pub_keys, uint256[] values, uint256[] dest_dhe_points, uint256[] encrypted_data,
 						uint256[] I, uint256[] input_pub_keys, uint256[] signature)
         public requireECMath requireMLSAGVerify returns (bool success)
     {		
 		//Check Ring CT Tx for Validity
-        if (!ValidateRingCTTx(	redeem_eth_address, redeem_value, redeem_blinding_factor,
+        if (!ValidateRingCTTx(	redeem_eth_address, redeem_eth_value,
                                 dest_pub_keys, values, dest_dhe_points, encrypted_data,
 								I, input_pub_keys, signature)) return false;
 								
@@ -359,10 +358,10 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
 		ProcessRingCTTx(dest_pub_keys, values, dest_dhe_points, encrypted_data, I);
 		
 		//Send redeemed value to ETH address
-		redeem_eth_address.transfer(redeem_value);
+		redeem_eth_address.transfer(redeem_eth_value);
 		
 		//Log Withdrawal
-		emit Withdrawal(redeem_eth_address, redeem_value);
+		emit Withdrawal(redeem_eth_address, redeem_eth_value);
 		
 		return true;
     }
@@ -460,14 +459,15 @@ contract RingCTToken is StealthTransaction, ECMathInterface, MLSAGVerifyInterfac
                             mlsagVerify.Keccak256OfArray(encrypted_data));
     }
 	
-	function HashWithdrawMsg(	address ethAddress, uint256 value, uint256 bf,
-								uint256[] dest_pub_keys, uint256[] output_commitments, uint256[] dest_dhe_points)
+	function HashWithdrawMsg(	address ethAddress, uint256 value,
+								uint256[] dest_pub_keys, uint256[] output_commitments, uint256[] dest_dhe_points, uint256[] encrypted_data)
 		internal view returns (bytes32 msgHash)
 	{
-		msgHash = keccak256(ethAddress, value, bf, 
+		msgHash = keccak256(ethAddress, value, 
 		                    mlsagVerify.Keccak256OfArray(dest_pub_keys),
 		                    mlsagVerify.Keccak256OfArray(output_commitments),
-		                    mlsagVerify.Keccak256OfArray(dest_dhe_points));
+		                    mlsagVerify.Keccak256OfArray(dest_dhe_points),
+                            mlsagVerify.Keccak256OfArray(encrypted_data));
 	}
 	
 	//AddColumnsToArray

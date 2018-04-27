@@ -95,7 +95,7 @@ contract RingMixerV2 {
     //      signature[2*N+2 ... 31     ] - Padding (0)
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
-    //  success (bool) - true/false indicating if signature is valid on message
+    //   success (bool) - true/false indicating if signature is valid on message
     function Withdraw(address[] destination, uint256[] value, uint256[] signature)
         public returns (bool success) 
     {

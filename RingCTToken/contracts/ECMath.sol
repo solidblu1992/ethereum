@@ -15,13 +15,10 @@ contract ECMath is Debuggable {
 	uint256 constant private a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
 	
 	constructor() public {
-        G1[0] = 1;
-    	G1[1] = 2;
-		
+        G1 = [uint256(1), 2];
     	H = HashToPoint(G1);
 		
-		Inf[0] = 0;
-		Inf[1] = 0;
+		Inf = [uint256(0), 0];
 	}
 	
 	//Base EC Parameters
@@ -200,7 +197,7 @@ contract ECMath is Debuggable {
 	function EvaluateCurve(uint256 x)
     	public constant returns (uint256 y, bool onCurve)
 	{
-    	uint256 y_squared = mulmod(x,x, PCurve);
+    	uint256 y_squared = mulmod(x, x, PCurve);
     	y_squared = mulmod(y_squared, x, PCurve);
     	y_squared = addmod(y_squared, 3, PCurve);
    	 
@@ -246,8 +243,7 @@ contract ECMath is Debuggable {
    	 
     	//TODO: Find better failure case for point not on curve
     	if (!onCurve) {
-        	Pout[0] = 0;
-        	Pout[1] = 0;
+    	    Pout = [uint256(0), 0];
     	}
     	else {
         	//Use Positive Y
@@ -292,15 +288,14 @@ contract ECMath is Debuggable {
     function HashOfPoint(uint256[2] point)
         public pure returns (uint256 h)
     {
-        bytes32 b = keccak256(point[0], point[1]);
-        h = uint256(b);
+        h = uint256(keccak256(point[0], point[1]));
     }
     
 	//Return H = alt_bn128 evaluated at keccak256(p)
     function HashToPoint(uint256[2] p)
         public constant returns (uint256[2] h)
     {
-        h[0] = uint256(HashOfPoint(p)) % PCurve;
+        h[0] = HashOfPoint(p) % PCurve;
         
         bool onCurve = false;
         while(!onCurve) {

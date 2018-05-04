@@ -104,47 +104,42 @@ class RingCT:
                     input_commitments_new[j*(m-1)+i] = mixin_transactions[j*(m-1)+i].c_value
 
         #Start building signature massage over output public keys, committed values, dhe points, and encrypted messages (both message and iv)
-        hasher = sha3.keccak_256()
-        subhashes = []
-        hasher.update(int_to_bytes32(output_count*2))
-        for i in range(0, output_count):    
+        #Hash output transactions
+        msgHash = int_to_bytes32(output_count)
+
+        for i in range(0, output_count):
+            #Continue hash chain
+            hasher = sha3.keccak_256(msgHash)
+
+            #Hash pub keys, values, dhe points, and encrypted data
             hasher.update(int_to_bytes32(output_transactions[i].pub_key[0].n))
             hasher.update(int_to_bytes32(output_transactions[i].pub_key[1].n))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(output_count*2))
-        for i in range(0, output_count):
-            assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])),output_transactions[i].c_value)) 
+            assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])),output_transactions[i].c_value))
             hasher.update(int_to_bytes32(output_transactions[i].c_value[0].n))
             hasher.update(int_to_bytes32(output_transactions[i].c_value[1].n))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(output_count*2))
-        for i in range(0, output_count):
             hasher.update(int_to_bytes32(output_transactions[i].dhe_point[0].n))
             hasher.update(int_to_bytes32(output_transactions[i].dhe_point[1].n))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(output_count*3))
-        for i in range(0, output_count):
             hasher.update(output_transactions[i].pc_encrypted_data.message)
             hasher.update(int_to_bytes32(bytes_to_int(output_transactions[i].pc_encrypted_data.iv)))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
+            #Compute new digest
+            msgHash = hasher.digest()
 
         #Hash ETH redeem address and value if they are used
         if (redeem_eth_value > 0):
+            #Continue hash chain
+            hasher = sha3.keccak_256(msgHash)
+
+            #Hash redeem address and value
             hasher.update(int_to_bytes20(redeem_eth_address))
             hasher.update(int_to_bytes32(redeem_eth_value))
-        
-        for i in range(0, len(subhashes)):
-            hasher.update(subhashes[i])
 
-        msgHash = hasher.digest()
+            #Compute new digest
+            msgHash = hasher.digest()
+        
         neg_total_out_commitment = neg(add(multiply(H, in_value), multiply(G1, total_out_bf)))
         
         #Sum up last column
@@ -204,45 +199,40 @@ class RingCT:
             if (not eq(s_point, self.mlsag.pub_keys[j*m+(m-1)])): return False
 
         #Verify hash of output transactions: public keys, committed values, dhe_points, and encrypted data (message and iv)
-        hasher = sha3.keccak_256()
-        subhashes = []
-        hasher.update(int_to_bytes32(output_count*2))
-        for i in range(0, output_count):    
+        #Hash output transactions
+        msgHash = int_to_bytes32(output_count)
+
+        for i in range(0, output_count):
+            #Continue hash chain
+            hasher = sha3.keccak_256(msgHash)
+
+            #Hash pub keys, values, dhe points, and encrypted data
             hasher.update(int_to_bytes32(self.output_transactions[i].pub_key[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].pub_key[1].n))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(output_count*2))
-        for i in range(0, output_count):
             hasher.update(int_to_bytes32(self.output_transactions[i].c_value[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].c_value[1].n))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(output_count*2))
-        for i in range(0, output_count):
             hasher.update(int_to_bytes32(self.output_transactions[i].dhe_point[0].n))
             hasher.update(int_to_bytes32(self.output_transactions[i].dhe_point[1].n))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
-        hasher.update(int_to_bytes32(output_count*3))
-        for i in range(0, output_count):
             hasher.update(self.output_transactions[i].pc_encrypted_data.message)
             hasher.update(int_to_bytes32(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)))
 
-        subhashes = subhashes + [hasher.digest()]
-        hasher = sha3.keccak_256()
+            #Compute new digest
+            msgHash = hasher.digest()
 
         #Hash ETH redeem address and value if they are used
-        if (redeem_eth_value > 0):
-            hasher.update(int_to_bytes20(redeem_eth_address))
-            hasher.update(int_to_bytes32(redeem_eth_value))
-            
-        for i in range(0, len(subhashes)):
-            #print("Subhash (" + str(i) + "): " + hex(bytes_to_int(subhashes[i])))
-            hasher.update(subhashes[i])
+        if (self.redeem_eth_value > 0):
+            #Continue hash chain
+            hasher = sha3.keccak_256(msgHash)
+
+            #Hash redeem address and value
+            hasher.update(int_to_bytes20(self.redeem_eth_address))
+            hasher.update(int_to_bytes32(self.redeem_eth_value))
+
+            #Compute new digest
+            msgHash = hasher.digest()
 
         msgHash = hasher.digest()        
         if (msgHash != self.mlsag.msgHash): return False
@@ -275,102 +265,13 @@ class RingCT:
             print("-----")
             print("Redeemed ETH Address: " + hex(self.redeem_eth_address))
             print("Redeemed ETH Value: " + str(self.redeem_eth_value) + " wei or " + str(self.redeem_eth_value / 10**18) + " ETH")
-            
-    #Prints Ring CT parameters and signature in a format to be verified on the Ethereum blockchain
-    def Print_Remix(self):
-        output_count = len(self.output_transactions)
-        
-        #Print Withdrawal information if applicable
-        if (self.redeem_eth_value > 0):
-            print("Ring CT Remix Representation - for use with Withdraw():")
-            print(hex(self.redeem_eth_address))
-            print(str(self.redeem_eth_value))
-        else:
-            print("Ring CT Remix Representation - for use with Send():")
-
-        #Print destination public keys  
-        print("[", end="")
-        for i in range(0, output_count):
-            print("\"" + hex(self.output_transactions[i].pub_key[0].n) + "\",\n\"" + hex(self.output_transactions[i].pub_key[1].n) + "\"", end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-            else:
-                print("],")
-
-        #Print destination committed values
-        print("[", end="")
-        for i in range(0, output_count):
-            print("\"" + hex(self.output_transactions[i].c_value[0].n) + "\",\n\"" + hex(self.output_transactions[i].c_value[1].n) + "\"", end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-            else:
-                print("],")    
-
-        #Print destination DHE Points
-        print("[", end="")
-        for i in range(0, output_count):
-            print("\"" + hex(self.output_transactions[i].dhe_point[0].n) + "\",\n\"" + hex(self.output_transactions[i].dhe_point[1].n) + "\"", end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-            else:
-                print("],")
-
-        #Print encrypted data + iv
-        print("[", end="")
-        for i in range(0, output_count):
-            print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + "\",")
-            print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + "\",")
-            print("\"" + hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)) + "\"", end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-            else:
-                print("],")
-
-        #Print key images (all of them)
-        m = len(self.mlsag.key_images)
-        print("[", end="")
-        for i in range(0, m):
-            print("\"" + hex(self.mlsag.key_images[i][0].n) + "\",\n\"" + hex(self.mlsag.key_images[i][1].n) + "\"", end = "")
-
-            if (i < (m-1)):
-                print(",")
-            else:
-                print("],")
-
-        #Print public keys (except last column - calculated by contract)
-        assert(len(self.mlsag.pub_keys) % m == 0)
-        n = len(self.mlsag.pub_keys) // m
-        print("[", end="")
-        for j in range(0, n):
-            for i in range(0, m-1):
-                print("\"" + hex(self.mlsag.pub_keys[j*m+i][0].n) + "\",\n\"" + hex(self.mlsag.pub_keys[j*m+i][1].n) + "\"", end = "")
-
-                if (i < (m-2)):
-                    print(",")
-
-            if (j < (n-1)):
-                print(",")
-            else:
-                print("],")
-
-        #Print signature (c1, s1, s2, ... snm)
-        L = len(self.mlsag.signature)
-        print("[", end="")
-        for i in range(0, L-1):
-            print("\"" + hex(self.mlsag.signature[i]) + "\",")
-
-        print("\"" + hex(self.mlsag.signature[L-1]) + "\"]")
 
     def Print_MEW(self):
         output_count = len(self.output_transactions)
 
         #Print Withdrawal information if applicable
         if (self.redeem_eth_value > 0):
-            print("Ring CT MEW Representation - for use with Send():")
+            print("Ring CT MEW Representation - for use with Withdraw():")
             print("redeem_eth_address:")
             print(hex(self.redeem_eth_address))
                 
@@ -382,7 +283,7 @@ class RingCT:
         #Print destination public keys
         print("\ndest_pub_keys:")
         for i in range(0, output_count):
-            print(hex(self.output_transactions[i].pub_key[0].n) + ",\n" + hex(self.output_transactions[i].pub_key[1].n), end = "")
+            print(point_to_str(self.output_transactions[i].pub_key), end = "")
 
             if (i < (output_count-1)):
                 print(",")
@@ -390,7 +291,7 @@ class RingCT:
         #Print destination committed values
         print("\n\nvalues:")
         for i in range(0, output_count):
-            print(hex(self.output_transactions[i].c_value[0].n) + ",\n" + hex(self.output_transactions[i].c_value[1].n), end = "")
+            print(point_to_str(self.output_transactions[i].c_value), end = "")
 
             if (i < (output_count-1)):
                 print(",")
@@ -398,7 +299,7 @@ class RingCT:
         #Print destination DHE Points
         print("\n\ndest_dhe_points:")
         for i in range(0, output_count):
-            print(hex(self.output_transactions[i].dhe_point[0].n) + ",\n" + hex(self.output_transactions[i].dhe_point[1].n), end = "")
+            print(point_to_str(self.output_transactions[i].dhe_point), end = "")
 
             if (i < (output_count-1)):
                 print(",")
@@ -406,20 +307,11 @@ class RingCT:
         #Print encrypted data
         print("\n\nencrypted_data:")
         for i in range(0, output_count):
-            print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + ",")
-            print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + ",")
-            print(hex(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)), end = "")
+            print(bytes32_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + ",")
+            print(bytes32_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + ",")
+            print(bytes32_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)), end = "")
 
             if (i < (output_count-1)):
-                print(",")
-
-        #Print key images (all of them)
-        m = len(self.mlsag.key_images)
-        print("\n\nI:")
-        for i in range(0, m):
-            print(hex(self.mlsag.key_images[i][0].n) + ",\n" + hex(self.mlsag.key_images[i][1].n), end = "")
-
-            if (i < (m-1)):
                 print(",")
 
         #Print public keys (except last column - calculated by contract)
@@ -428,7 +320,7 @@ class RingCT:
         print("\n\ninput_pub_keys:")
         for j in range(0, n):
             for i in range(0, m-1):
-                print(hex(self.mlsag.pub_keys[j*m+i][0].n) + ",\n" + hex(self.mlsag.pub_keys[j*m+i][1].n), end = "")
+                print(point_to_str(self.mlsag.pub_keys[j*m+i]), end = "")
 
                 if (i < (m-2)):
                     print(",")
@@ -436,13 +328,22 @@ class RingCT:
             if (j < (n-1)):
                 print(",")
 
+        #Print key images (all of them)
+        m = len(self.mlsag.key_images)
+        print("\n\nI:")
+        for i in range(0, m):
+            print(point_to_str(self.mlsag.key_images[i]), end = "")
+
+            if (i < (m-1)):
+                print(",")
+
         #Print signature (c1, s1, s2, ... snm)
         L = len(self.mlsag.signature)
         print("\n\nsignature:")
         for i in range(0, L-1):
-            print(hex(self.mlsag.signature[i]) + ",")
+            print(bytes32_to_str(self.mlsag.signature[i]) + ",")
 
-        print(hex(self.mlsag.signature[L-1]))
+        print(bytes32_to_str(self.mlsag.signature[L-1]))
 
 def RingCTTest(input_count = 2, mixin_count = 3, outputs = 2, rngSeed=0):
     import random

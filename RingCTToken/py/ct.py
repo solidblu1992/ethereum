@@ -114,33 +114,6 @@ class PCRangeProof:
         
 
     #Prints range proof in a format to be verified on the Ethereum blockchain
-    def Print_Remix(self):
-        L = len(self.range_proof.pub_keys)
-        if (L % 4 != 0): return False
-        L = L // 4
-
-        print("Range Proof Remix Representation - for use with CTProvePositive():")
-
-        #Print Total Commitment
-        commitment = self.GetTotalCommitment()
-        print("[\"" + hex(commitment[0].n) + "\",\n\"" + hex(commitment[1].n) + "\"],")
-        print("\"" + str(self.pow10) + "\",\"" + str(self.offset) + "\",")
-
-        #Print Bitwise Commitments
-        print("[", end="")
-        for i in range(0, L-1):
-            print("\"" + hex(self.range_proof.pub_keys[i][0].n) + "\",\n\"" + hex(self.range_proof.pub_keys[i][1].n) + "\",")
-
-        print("\"" + hex(self.range_proof.pub_keys[L-1][0].n) + "\",\n\"" + hex(self.range_proof.pub_keys[L-1][1].n) + "\"],")
-
-        #Print Signature
-        L = len(self.range_proof.signature)
-        print("[", end="")
-        for i in range(0, L-1):
-            print("\"" + hex(self.range_proof.signature[i]) + "\",")
-
-        print("\"" + hex(self.range_proof.signature[L-1]) + "\"]")
-
     def Print_MEW(self):
         L = len(self.range_proof.pub_keys)
         if (L % 4 != 0): return False
@@ -151,8 +124,8 @@ class PCRangeProof:
         #Print Total Commitment
         commitment = self.GetTotalCommitment()
         
-        print("total_commit:")       
-        print(hex(commitment[0].n) + ",\n" + hex(commitment[1].n))
+        print("total_commit:")
+        print(point_to_str(commitment))
 
         print("\npower_10:")
         print(str(self.pow10))
@@ -163,17 +136,17 @@ class PCRangeProof:
         #Print Bitwise Commitments
         print("\nbit_commits:")
         for i in range(0, L-1):
-            print(hex(self.range_proof.pub_keys[i][0].n) + ",\n" + hex(self.range_proof.pub_keys[i][1].n) + ",")
+            print(point_to_str(self.range_proof.pub_keys[i]) + ",")
 
-        print(hex(self.range_proof.pub_keys[L-1][0].n) + ",\n" + hex(self.range_proof.pub_keys[L-1][1].n))
+        print(point_to_str(self.range_proof.pub_keys[L-1]))
 
         #Print Signature
         print("\nsignature:")
         L = len(self.range_proof.signature)
         for i in range(0, L-1):
-            print(hex(self.range_proof.signature[i]) + ",")
+            print(bytes32_to_str(self.range_proof.signature[i]) + ",")
 
-        print(hex(self.range_proof.signature[L-1]))
+        print(bytes32_to_str(self.range_proof.signature[L-1]))
         
         
 

@@ -54,10 +54,7 @@ contract ECMathInterface is Debuggable {
     //Prerequisite Contract(s)
 	ECMath ecMath;
 	
-	event ContractAddressChanged (
-	    string _name,
-	    address _new
-	);
+	event ContractAddressChanged (string _name, address _new);
 	
 	//Prerequisite Contract Meta Functions
 	function ECMath_GetAddress() public constant returns (address) {
@@ -88,7 +85,7 @@ contract ECMathInterface is Debuggable {
 	}
 	
 	//Contstructor Function - Initializes Prerequisite Contract(s)
-	constructor() public {
-	    ECMath_ChangeAddress(0x47346DF43dC7a2b821C7d5cd871E8A0edc38F37d);
+	constructor(address ecMathAddr) public {
+	    ECMath_ChangeAddress(ecMathAddr);
 	}
 }

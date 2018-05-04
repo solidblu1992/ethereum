@@ -11,7 +11,7 @@ def PrintTxExportAsDeposit(transaction_pool, stealth_addr=None):
     print("Pub Keys:")
     #print("[", end = "")
     for i in range (0, len(transaction_pool)):
-        print(hex(transaction_pool[i][0]), end = "")
+        print(bytes32_to_str(transaction_pool[i][0]), end = "")
         if (i < (len(transaction_pool)-1)):
             print(",")
         else:
@@ -21,7 +21,7 @@ def PrintTxExportAsDeposit(transaction_pool, stealth_addr=None):
     print("DHE Points:")
     #print("[", end = "")
     for i in range (0, len(transaction_pool)):
-        print(hex(transaction_pool[i][1]), end = "")
+        print(bytes32_to_str(transaction_pool[i][1]), end = "")
         if (i < (len(transaction_pool)-1)):
             print(",")
         else:
@@ -54,7 +54,7 @@ def PrintTxExportAsDeposit(transaction_pool, stealth_addr=None):
         print("C Values:")
         #print("[", end = "")
         for i in range (0, len(transaction_pool)):
-            print(hex(transaction_pool[i][2]), end = "")
+            print(bytes32_to_str(transaction_pool[i][2]), end = "")
             
             if (i < (len(transaction_pool)-1)):
                 print(",")

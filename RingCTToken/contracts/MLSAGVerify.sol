@@ -5,12 +5,10 @@ import "./ECMathInterface.sol";
 
 contract MLSAGVerify is ECMathInterface {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
-	constructor() public {
-	
-	}
+	constructor(address ecMathAddr) ECMathInterface(ecMathAddr) public {}
     
     //Struct for reducing stack length
-    struct MLSAGVariables {
+    struct Variables {
         uint256 m;              //Number of keys (# of rings)
         uint256 n;              //Number of ring members (per ring)
         uint256 i;              //for use in "for" loop (i = {0, ..., m})
@@ -19,12 +17,11 @@ contract MLSAGVerify is ECMathInterface {
         uint256 index;          //General purpose uint256 for picking index of arrays
         uint256[2] point1;      //Expanded EC Point for general purpose use
         uint256[2] point2;      //Expanded EC Point for general purpose use
-        uint256[2] point3;      //Expanded EC Point for general purpose use
         uint256[2] keyImage;    //Expanded EC Point representing key image
     }
     
     //Non-linkable Ring Signature Functions
-    function RingHashFunction(bytes32 msgHash, uint256[2] point)
+    function RingHashFunction(uint256 msgHash, uint256[2] point)
         public view returns (uint256 h)
     {
         return uint256(keccak256(msgHash, point[0], point[1])) % ecMath.GetNCurve();
@@ -36,7 +33,7 @@ contract MLSAGVerify is ECMathInterface {
         Pout = ecMath.Multiply(ecMath.GetG1(), alpha);
     }
     
-    function StartRing(bytes32 msgHash, uint256 alpha)
+    function StartRing(uint256 msgHash, uint256 alpha)
         public constant returns (uint256 ckp)
     {
         ckp = RingHashFunction(msgHash, StartRing_NoHash(alpha));
@@ -51,7 +48,7 @@ contract MLSAGVerify is ECMathInterface {
         Pout = ecMath.Add(Pout, temp);
     }
     
-    function CalculateRingSegment(bytes32 msgHash, uint256 ck, uint256 sk, uint256[2] P)
+    function CalculateRingSegment(uint256 msgHash, uint256 ck, uint256 sk, uint256[2] P)
         public constant returns (uint256 ckp)
     {
         uint256[2] memory temp;
@@ -70,7 +67,7 @@ contract MLSAGVerify is ECMathInterface {
     }
     
     //Linkable Ring Signature Functions
-    function LinkableRingHashFunction(bytes32 msgHash, uint256[2] left, uint256[2] right)
+    function LinkableRingHashFunction(uint256 msgHash, uint256[2] left, uint256[2] right)
         public view returns (uint256 h)
     {
         return uint256(keccak256(msgHash, left[0], left[1], right[0], right[1])) % ecMath.GetNCurve();
@@ -95,7 +92,7 @@ contract MLSAGVerify is ECMathInterface {
         Rout = ecMath.Multiply(Rout, alpha);
     }
     
-    function StartLinkableRing(bytes32 msgHash, uint256 alpha, uint256[2] P)
+    function StartLinkableRing(uint256 msgHash, uint256 alpha, uint256[2] P)
         public constant returns (uint256 ckp)
     {
         uint256[2] memory left;
@@ -118,7 +115,7 @@ contract MLSAGVerify is ECMathInterface {
         Rout = ecMath.Add(Rout, temp);
     }
     
-    function CalculateLinkableRingSegment(bytes32 msgHash, uint256 ck, uint256 sk, uint256[2] P, uint256[2] I)
+    function CalculateLinkableRingSegment(uint256 msgHash, uint256 ck, uint256 sk, uint256[2] P, uint256[2] I)
         public constant returns (uint256 ckp)
     {
         uint256[2] memory left;
@@ -143,22 +140,6 @@ contract MLSAGVerify is ECMathInterface {
     	
     	out = temp[0];
     }
-	
-    function Keccak256OfArray(uint128[] array)
-        public pure returns (uint256 out)
-    {
-        uint256 len = array.length;
-        uint256[1] memory temp;
-        
-        //Construct c1 (store in c[0])
-    	assembly {
-    	    let p := mload(0x40)
-    	    mstore(p, add(mul(len, 0x20), 0x20)) //0x20 = 32; 32 bytes for array length + 32 bytes per uint256
-    	    mstore(temp, keccak256(array, mload(p)))
-    	}
-    	
-    	out = temp[0];
-    }
     
 	//----------------------------
 	//MSLAG Verification Functions
@@ -168,16 +149,16 @@ contract MLSAGVerify is ECMathInterface {
     //msgHash = hash of message signed by ring signature
     //P = {P1x, P1y, P2x, P2y, ..., Pnx, Pny}
     //signature = {c1, s1, s2, ... , sn}
-    function VerifySAG(bytes32 msgHash, uint256[] P, uint256[] signature)
+    function VerifySAG(uint256 msgHash, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         //Check input array lengths
-        MLSAGVariables memory v;
+        Variables memory v;
         if (P.length % 2 != 0) return false;
         v.n = (P.length / 2);
         if (signature.length != (v.n+1)) return false;
         
-        v.ck = signature[0];            //extract c1
+        v.ck = signature[0];                            //extract c1
         for (v.i = 0; v.i < v.n; v.i++) {
             (v.point1[0], v.point1[1]) = (P[2*v.i], P[2*v.i+1]); //extract public key
             v.ck = CalculateRingSegment(msgHash, v.ck, signature[v.i+1], v.point1);
@@ -192,7 +173,7 @@ contract MLSAGVerify is ECMathInterface {
     //msgHash = hash of message signed by ring signature
     //P = {P1, P2, ... , Pn}
     //signature = {c1, s1, s2, ... , sn}
-    function VerifySAG_Compressed(bytes32 msgHash, uint256[] P, uint256[] signature)
+    function VerifySAG_Compressed(uint256 msgHash, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         uint256[2] memory temp;
@@ -212,17 +193,17 @@ contract MLSAGVerify is ECMathInterface {
     //I = {Ix, Iy}
     //P = {P1x, P1y, P2x, P2y, ..., Pnx, Pny}
     //signature = {c1, s1, s2, ..., sn}
-    function VerifyLSAG(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
+    function VerifyLSAG(uint256 msgHash, uint256[] I, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         //Check input array lengths
-        MLSAGVariables memory v;
+        Variables memory v;
         if (I.length != 2) return false;
         if (P.length % 2 != 0) return false;
         v.n = (P.length / 2);
         if (signature.length != (v.n+1)) return false;
         
-        v.ck = signature[0];                            //extract c1
+        v.ck = signature[0];                   //extract c1
         (v.keyImage[0], v.keyImage[1]) = (I[0], I[1]);  //extract key image
         
         for (v.i = 0; v.i < v.n; v.i++) {
@@ -240,7 +221,7 @@ contract MLSAGVerify is ECMathInterface {
     //I = key image (compressed EC point)
     //P = {P1, P2, ... , Pn}
     //signature = {c1, s1, s2, ... , sn}
-    function VerifyLSAG_Compressed(bytes32 msgHash, uint256 I, uint256[] P, uint256[] signature)
+    function VerifyLSAG_Compressed(uint256 msgHash, uint256 I, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         uint256[2] memory temp;
@@ -268,11 +249,11 @@ contract MLSAGVerify is ECMathInterface {
     //signature = {c1,  s11, s12, ..., s1m,
     //                  s21, s22, ..., s2m,
     //                  sn1, sn2, ..., snm  }
-    function VerifyMSAG(uint256 m, bytes32 msgHash, uint256[] P, uint256[] signature)
+    function VerifyMSAG(uint256 m, uint256 msgHash, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         //Check input array lengths
-        MLSAGVariables memory v;
+        Variables memory v;
         v.m = m;
         if (P.length % (2*v.m) != 0) return false;
         
@@ -281,7 +262,7 @@ contract MLSAGVerify is ECMathInterface {
         
         //Allocate array for calculating c1
         uint256[] memory c = new uint256[](2*v.m+1);
-        c[0] = uint256(msgHash);
+        c[0] = msgHash;
         
         for (v.i = 0; v.i < v.m; v.i++) {
             v.ck = signature[0];                //extract c1
@@ -320,7 +301,7 @@ contract MLSAGVerify is ECMathInterface {
     //signature = {c1,  s11, s12, ..., s1m,
     //                  s21, s22, ..., s2m,
     //                  sn1, sn2, ..., snm  }
-    function VerifyMSAG_Compressed(uint256 m, bytes32 msgHash, uint256[] P, uint256[] signature)
+    function VerifyMSAG_Compressed(uint256 m, uint256 msgHash, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         uint256[2] memory temp;
@@ -345,11 +326,11 @@ contract MLSAGVerify is ECMathInterface {
     //signature = {c1,  s11, s12, ..., s1m,
     //                  s21, s22, ..., s2m,
     //                  sn1, sn2, ..., snm  }
-    function VerifyMLSAG(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
+    function VerifyMLSAG(uint256 msgHash, uint256[] I, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         //Check input array lengths
-        MLSAGVariables memory v;
+        Variables memory v;
         if(I.length % 2 != 0) return false;
         v.m = (I.length / 2);
         if (P.length % (2*v.m) != 0) return false;
@@ -359,10 +340,10 @@ contract MLSAGVerify is ECMathInterface {
         
         //Allocate array for calculating c1
         uint256[] memory c = new uint256[](4*v.m+1);
-        c[0] = uint256(msgHash);
+        c[0] = msgHash;
         
         for (v.i = 0; v.i < v.m; v.i++) {
-            v.ck = signature[0];                //extract c1
+            v.ck = signature[0];        //extract c1
             v.keyImage = [I[2*v.i], I[2*v.i+1]]; //extract key image
             
             //Calculate (n-1) ring segments (output scalar ck)
@@ -400,7 +381,7 @@ contract MLSAGVerify is ECMathInterface {
     //      P21, P22, ..., P2m,
     //      Pn1, Pn2, ..., Pnm }
     //signature = {c1, s11, s12, ..., s1m, s21, s22, ..., s2m, ..., sn1, sn2, ..., snm}
-    function VerifyMLSAG_Compressed(bytes32 msgHash, uint256[] I, uint256[] P, uint256[] signature)
+    function VerifyMLSAG_Compressed(uint256 msgHash, uint256[] I, uint256[] P, uint256[] signature)
         public constant returns (bool success)
     {
         uint256[2] memory temp;

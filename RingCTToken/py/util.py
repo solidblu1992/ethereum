@@ -64,6 +64,16 @@ def int_to_bytes16(i):
 def to_point(x, y):
     return (FQ(x), FQ(y))
 
+def bytes32_to_str(b):
+    s = hex(b)
+
+    if (len(s) != 66):
+        y = 66 - len(s)
+        y = "0" * y
+        s = "0x" + y + s[2:]
+
+    return s
+
 def print_point(p):
     if (type(p) == tuple):
         s = hex(p[0].n)
@@ -90,6 +100,13 @@ def print_point(p):
             y = "0" * y
             s = "0x" + y + s[2:]
             
+    return s
+
+def point_to_str(p):
+    if (type(p) != tuple):
+        p = ExpandPoint(p)
+    
+    s = (bytes32_to_str(p[0].n) + ",\n" + bytes32_to_str(p[1].n))
     return s
 
 def hash_of_int(i):

@@ -56,7 +56,6 @@ contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
 			//Add unmasked value as a commitment
 			v.point1 = ecMath.MultiplyH(args.redeem_eth_value);
 			v.keyImage = ecMath.Add(v.keyImage, v.point1);
-			v.keyImage = ecMath.Negate(v.keyImage);
 		}
 		
         v.keyImage = ecMath.Negate(v.keyImage);

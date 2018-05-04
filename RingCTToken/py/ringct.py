@@ -315,6 +315,7 @@ class RingCT:
                 print(",")
 
         #Print public keys (except last column - calculated by contract)
+        m = len(self.mlsag.key_images)
         assert(len(self.mlsag.pub_keys) % m == 0)
         n = len(self.mlsag.pub_keys) // m
         print("\n\ninput_pub_keys:")
@@ -329,7 +330,6 @@ class RingCT:
                 print(",")
 
         #Print key images (all of them)
-        m = len(self.mlsag.key_images)
         print("\n\nI:")
         for i in range(0, m):
             print(point_to_str(self.mlsag.key_images[i]), end = "")

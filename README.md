@@ -1,7 +1,10 @@
-# Deployed Addresses
-RingCTToken (https://ropsten.etherscan.io/address/0xe9d55efc9990d692f38092ad5dc4a2c066fa61f5)
+# RingCT Token
+RingCTToken (https://ropsten.etherscan.io/address/0xd338F788151DbF652EA2dDd34071b1d5cEcCAABC)
 
-# Old Contracts
-Simple Ring Mixer (https://ropsten.etherscan.io/address/0x5e10d764314040b04ac7d96610b9851c8bc02815)
 
-CToE Token (https://ropsten.etherscan.io/address/0xeace8fbe35577a892a01a05220deac93af9af0ce)
+# Supporting Contracts
+RingCTTxVerify (https://ropsten.etherscan.io/address/0x571dCC912bB50928EBbdb4C073991DB3fAE697Dd)
+
+MLSAGVerify (https://ropsten.etherscan.io/address/0x20f85EFa703B0448604a9Ecfcae199B992CF5bf0)
+
+ECMath (https://ropsten.etherscan.io/address/0x763A155B1ffF11a73B266b4529947D0E0F2455F2)

@@ -50,13 +50,21 @@ def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, outp
  
     tx0 = rct.SendTx(list(range(0,input_count)), mixin_count, output_values)
     rct.MarkUTXOAsSpent(list(range(0,input_count)))
-    rct.MintPendingUTXOs(list(range(0,input_count)))
-    
-    tx1 = rct.WithdrawTx(0x616837c633c543a6796c34b6607CC3b36e38fFAa, 10**15, [0], mixin_count, None)
-    
-    return (rct, tx0, tx1)
+    rct.MintPendingUTXOs(list(range(0,output_count)))
 
-(rct, tx0, tx1) = RingCTTokenTest()
+    #Create Withdraw Tx to Specific Address
+    tx1 = rct.WithdrawTx(0x616837c633c543a6796c34b6607CC3b36e38fFAa, 10**15, [0], mixin_count, None)
+    rct.MarkUTXOAsSpent(0)
+    rct.MintPendingUTXOs(0)
+
+    #Create Withdraw Tx to Any Address
+    #(offer bounty to anyone who broadcasts tx to block chain
+    tx2 = rct.WithdrawTx(0x0, 2*(10**15), [0], mixin_count, None)
+    
+    return (rct, tx0, tx1, tx2)
+
+(rct, tx0, tx1, tx2) = RingCTTokenTest()
+
 #rct = RingCTTokenTestImport(StealthAddressExport, UTXOPoolExport + MixinPoolExport)
 #PrintTxExportAsDeposit(UTXOPoolExport + MixinPoolExport, StealthAddressExport)
 #sig = rct.SpendTx([1,5])

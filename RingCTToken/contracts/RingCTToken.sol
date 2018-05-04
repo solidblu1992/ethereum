@@ -4,7 +4,7 @@ import "./Debuggable.sol";
 import "./ECMathInterface.sol";
 import "./RingCTTxVerifyInterface.sol";
 
-contract StealthTransaction {
+contract StealthTransactionStorage {
 	//Constructor Logic
 	constructor() public { }
 	
@@ -28,7 +28,7 @@ contract StealthTransaction {
     }
 }
 
-contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
+contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, StealthTransactionStorage {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
 	constructor(address ringCTVerifyAddr, address ecMathAddr) RingCTTxVerifyInterface(ringCTVerifyAddr) ECMathInterface(ecMathAddr) public { }
 	
@@ -170,8 +170,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
     
 	//Marks UTXOs as spent by storing the key images and creates new UTXOs
 	//Internal function only
-	function ProcessRingCTTx(UTXO.Output[] output_tx, uint256[] I)
-	    internal requireECMath returns (bool)
+	function ProcessRingCTTx(UTXO.Output[] output_tx, uint256[] I) internal requireECMath
 	{
         //Store key images (point of no return, all returns need to be reverts after this point)
         uint256 i;
@@ -186,11 +185,14 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
 			pub_key = ecMath.CompressPoint(output_tx[i].pub_key);
 			value = ecMath.CompressPoint(output_tx[i].value);
 			
-			token_committed_balance[pub_key] = value;	//Store output commitment			
-			pub_keys_by_index[pub_key_count] = pub_key;	//Store public key
+			//Store output commitment and public key
+			token_committed_balance[pub_key] = value;		
+			pub_keys_by_index[pub_key_count] = pub_key;
 			pub_key_count++;
 			
-			//Compress DHE Point for event emission
+			//Unmark balance positive to free up space
+			//Realistically there is no situation in which using the same output commitment will be useful
+			balance_positive[value] = false;
 
 			//Log new stealth transaction
 			emit SendEvent(pub_key, ecMath.CompressPoint(output_tx[i].dhe_point), output_tx[i].encrypted_data);
@@ -315,6 +317,12 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
 		ProcessRingCTTx(args.output_tx, args.I);
 		
 		//Send redeemed value to ETH address
+		//If ETH address is 0x0, redeem the ETH to sender of the transaction
+		//This can be used to pay others to broadcast transactions for you
+		if (args.redeem_eth_address == 0) {
+			args.redeem_eth_address = msg.sender;
+		}
+		
 		args.redeem_eth_address.transfer(args.redeem_eth_value);
 		
 		//Log Withdrawal

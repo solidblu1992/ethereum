@@ -1,5 +1,5 @@
 # RingCT Token
-RingCTToken (https://ropsten.etherscan.io/address/0x23e959291baDa9D7B1CFCE68B051d2123ECe9dC9)
+RingCTToken (https://ropsten.etherscan.io/address/0x9e629513cF12cBC822c42ED3A8e76e6122a170b1)
 
 
 # Supporting Contracts

@@ -15,17 +15,21 @@ class PCRangeProof:
 
     def GenerateParameters(total_value, target_bits=1):
         import math
-        bits = 0
-        i = 0
-        while(bits < target_bits):
-            pow10 = math.floor(math.log(total_value,10)) - i
-            val = total_value // 10**pow10
-            bits = math.floor(math.log(val,4))+1
-            i = i + 1
+
+        if (total_value == 0):
+            return(0, 17, 0, target_bits)
+        else:
+            bits = 0
+            i = 0
+            while(bits < target_bits):
+                pow10 = math.floor(math.log(total_value,10)) - i
+                val = total_value // 10**pow10
+                bits = math.floor(math.log(val,4))+1
+                i = i + 1
+                
+            rem = total_value - ( (val) * (10**pow10))
             
-        rem = total_value - ( (val) * (10**pow10))
-        
-        return (val, pow10, rem, bits)
+            return (val, pow10, rem, bits)
 
     def Commit(value, blinding_factor):
         point = multiply(G1, blinding_factor)

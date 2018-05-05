@@ -4,54 +4,32 @@ import "./Debuggable.sol";
 import "./ECMathInterface.sol";
 import "./RingCTTxVerifyInterface.sol";
 
-contract StealthTransactionStorage {
-	//Constructor Logic
-	constructor() public { }
-	
-	//Stealth Address Mappings
-	mapping (address => uint256) public stx_pubviewkeys;    //Stores A=aG (public view key) for a given Ethereum Address
-    mapping (address => uint256) public stx_pubspendkeys;   //Stores B=bG (public spend key) for a given Ethereum Address
-	
-	event StealthTxPublishedEvent(address indexed addr, uint256 pubviewkey, uint256 pubspendkey);
-	
-	//Stealth Address Functions
-    //For a given msg.sender (ETH address) publish EC points for public spend and view keys
-    //These EC points will be used to generate stealth addresses
-    function PublishSTxPublicKeys(uint256 stx_pubviewkey, uint256 stx_pubspendkey)
-        public returns (bool success)
-    {
-        stx_pubviewkeys[msg.sender] = stx_pubviewkey;
-		stx_pubspendkeys[msg.sender] = stx_pubspendkey;
-		
-		emit StealthTxPublishedEvent(msg.sender, stx_pubviewkey, stx_pubspendkey);
-        success = true;
-    }
-}
-
-contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, StealthTransactionStorage {
+contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
 	constructor(address ringCTVerifyAddr, address ecMathAddr) RingCTTxVerifyInterface(ringCTVerifyAddr) ECMathInterface(ecMathAddr) public { }
 	
 	event WithdrawalEvent(address indexed _to, uint256 _value);
-	event DepositEvent (uint256 indexed _pub_key, uint256 _dhe_point, uint256 _value);
-	event SendEvent (uint256 indexed _pub_key, uint256 _dhe_point, uint256[3] _encrypted_data);
+	event DepositEvent (uint256 indexed _pub_key, uint256 indexed _dhe_point, uint256 _value);
+	event SendEvent (uint256 indexed _pub_key, uint256 indexed _value, uint256 indexed _dhe_point, uint256[3] _encrypted_data);
 	event PCRangeProvenEvent (uint256 indexed _commitment, uint256 _min, uint256 _max, uint256 _resolution);
-	
-	//Storage of Token Balances
-	uint256 public totalSupply;
-	
+	event StealthAddressPublishedEvent(address indexed addr, uint256 indexed pubviewkey, uint256 indexed pubspendkey);
+
 	//Mapping of EC Public Key to Pedersen Commitment of Value
 	mapping (uint256 => uint256) public token_committed_balance;
-	
-	//Mapping of uint256 index (0...pub_key_count-1) to known public keys (for finding mix in keys)
-	mapping (uint256 => uint256) public pub_keys_by_index;
-	uint256 public pub_key_count;
     
 	//Storage array of commitments which have been proven to be positive
 	mapping (uint256 => bool) public balance_positive;
 	
 	//Storage array for key images which have been used
 	mapping (uint256 => bool) public key_images;
+	
+	//Stealth Address Function(s)
+    //For a given msg.sender (ETH address) publish EC points for public spend and view keys
+    //These EC points will be used to generate stealth addresses
+    function PublishStealthAddress(uint256 stx_pubviewkey, uint256 stx_pubspendkey) public
+    {
+		emit StealthAddressPublishedEvent(msg.sender, stx_pubviewkey, stx_pubspendkey);
+    }
     
     //Transaction Functions
 	//Deposit Ether as CT tokens to the specified alt_bn_128 public key
@@ -67,14 +45,9 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, StealthTransac
     	
     	//Generate pedersen commitment and add to existing balance
     	token_committed_balance[dest_pub_key] = ecMath.CompressPoint(ecMath.MultiplyH(msg.value));
-    	pub_keys_by_index[pub_key_count] = dest_pub_key;
-    	pub_key_count++;
     	
     	//Log new stealth transaction
     	emit DepositEvent(dest_pub_key, dhe_point, msg.value);
-    	
-    	//Update global token supply
-    	totalSupply += msg.value;
 	}
 	
 	//Deposit Ether as CT tokens to the specified alt_bn_128 public keys
@@ -106,15 +79,10 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, StealthTransac
     	for (i = 0; i < dest_pub_keys.length; i++) {
         	//Generate pedersen commitment and add to existing balance
         	token_committed_balance[dest_pub_keys[i]] = ecMath.CompressPoint(ecMath.MultiplyH(values[i]));
-        	pub_keys_by_index[pub_key_count] = dest_pub_keys[i];
-        	pub_key_count++;
     	
     	    //Log new stealth transaction
 			emit DepositEvent(dest_pub_keys[i], dhe_points[i], values[i]);
     	}
-    	
-    	//Update global token supply
-    	totalSupply += msg.value;
     }
     
     //Internal function for checking positive commitment proofs
@@ -187,15 +155,13 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, StealthTransac
 			
 			//Store output commitment and public key
 			token_committed_balance[pub_key] = value;		
-			pub_keys_by_index[pub_key_count] = pub_key;
-			pub_key_count++;
 			
 			//Unmark balance positive to free up space
 			//Realistically there is no situation in which using the same output commitment will be useful
 			balance_positive[value] = false;
 
 			//Log new stealth transaction
-			emit SendEvent(pub_key, ecMath.CompressPoint(output_tx[i].dhe_point), output_tx[i].encrypted_data);
+			emit SendEvent(pub_key, value, ecMath.CompressPoint(output_tx[i].dhe_point), output_tx[i].encrypted_data);
 		}
 	}
 	

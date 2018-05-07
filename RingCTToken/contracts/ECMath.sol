@@ -29,23 +29,23 @@ contract ECMath is Debuggable {
 	function GetPCurve() public pure returns (uint256) { return PCurve; }
 	
 	function GetGHVector(uint256 length)
-		public constant returns (uint256[] Gxi, uint256[] Gyi, uint256[] Hxi, uint256[] Hyi)
+		public constant returns (uint256[] Gi, uint256[] Hi)
 	{
 	    require(length > 0);
+	    Gi = new uint256[](length*2);
+		Hi = new uint256[](length*2);
 	    
+	    uint256 index;
 		uint256[2] memory temp;
-		Gxi = new uint256[](length);
-		Gyi = new uint256[](length);
-		Hxi = new uint256[](length);
-		Hyi = new uint256[](length);
 		
 		temp = H;
 		for (uint256 i = 0; i < length; i++) {
+		    index = 2*i;
 			temp = HashToPoint(temp);
-			(Gxi[i], Gyi[i]) = (temp[0], temp[1]);
+			(Gi[index], Gi[index+1]) = (temp[0], temp[1]);
 			
 			temp = HashToPoint(temp);
-			(Hxi[i], Hyi[i]) = (temp[0], temp[1]);
+			(Hi[index], Hi[index+1]) = (temp[0], temp[1]);
 		}
 	}
 	
@@ -152,32 +152,85 @@ contract ECMath is Debuggable {
         return AddMultiply(p_add, H, s);
     }
     
+	//Returns p0 = s_G1*G1 + s_H*H
     function CommitG1H(uint256 s_G1, uint256 s_H)
         public constant returns (uint256[2] p0)
     {
         return Add(MultiplyG1(s_G1), MultiplyH(s_H));
     }
+	
+	//Vector Functions
+	function VectorScale(uint256[] X, uint256 s)
+		public constant returns (uint256[] Z)
+	{
+		require(X.length > 1);
+		require(X.length % 2 == 0);
+		
+		Z = new uint256[](X.length);
+		
+		uint256 i;
+		uint256[2] memory temp;
+		for (i = 0; i < X.length; i += 2) {
+			temp = Multiply([X[i], X[i+1]], s);
+			(Z[i], Z[i+1]) = (temp[0], temp[1]);
+		}
+	}
+	
+	function VectorAdd(uint256[] X, uint256[] Y)
+		public constant returns (uint256[] Z)
+	{
+		require(X.length > 1);
+		require(X.length % 2 == 0);
+		require(Y.length == X.length);
+		
+		Z = new uint256[](X.length);
+		
+		uint256 i;
+		uint256[2] memory temp;
+		for (i = 0; i < X.length; i += 2) {
+			temp = Add([X[i], X[i+1]], [Y[i], Y[i+1]]);
+			(Z[i], Z[i+1]) = (temp[0], temp[1]);
+		}
+	}
+	
+	function VectorMul(uint256[] X, uint256[] s)
+		public constant returns (uint256[] Z)
+	{
+		require(s.length > 0);
+		require(X.length == s.length*2);
+		
+		Z = new uint256[](X.length);
+		
+		uint256 i;
+		uint256 index;
+		uint256[2] memory temp;
+		for (i = 0; i < s.length; i++) {
+			index = 2*i;
+			temp = Multiply([X[index], X[index+1]], s[i]);
+			(Z[index], Z[index+1]) = (temp[0], temp[1]);
+		}
+	}
     
-    //Returns px = x[0]*Gi[0] + x[1]*Gi[1] + ... + x[n-1]*Gi[n-1]
-    //    and py = y[0]*Hi[0] + y[1]*Hi[1] + ... + y[n-1]*Hi[n-1]
-    function CommitGxHx(uint256[] x, uint256[] y)
+    //Returns px = x[0]*X[0] + x[1]*X[1] + ... + x[n-1]*X[n-1]
+    //    and py = y[0]*Y[0] + y[1]*Y[1] + ... + y[n-1]*Y[n-1]
+    function CommitAB(uint256[] X, uint256[] Y, uint256[] x, uint256[] y)
         public constant returns (uint256[2] px, uint256[2] py)
     {
         require(x.length > 0);
-        require(x.length == y.length);
+        require(y.length == x.length);
+        
+		require(X.length % 2 == 0);
+        require(X.length >= x.length*2);
+        require(Y.length == X.length);
         
         uint256 i;
-        uint256[] memory Gxi;
-        uint256[] memory Gyi;
-        uint256[] memory Hxi;
-        uint256[] memory Hyi;
-        (Gxi, Gyi, Hxi, Hyi) = GetGHVector(x.length);
-        
-        px = Multiply([Gxi[0], Gyi[0]], x[0]);
-        py = Multiply([Hxi[0], Hyi[0]], y[0]);
+        uint256 index;
+        px = Multiply([X[0], X[1]], x[0]);
+        py = Multiply([Y[0], Y[1]], y[0]);
         for (i = 1; i < x.length; i++) {
-            px = AddMultiply(px, [Gxi[i], Gyi[i]], x[i]);
-            py = AddMultiply(py, [Hxi[i], Hyi[i]], y[i]);
+            index = 2*i;
+            px = AddMultiply(px, [X[index], X[index+1]], x[i]);
+            py = AddMultiply(py, [Y[index], Y[index+1]], y[i]);
         }
     }
     

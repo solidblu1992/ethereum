@@ -10,7 +10,7 @@ contract ECMath {
 	function GetInfinity() public view returns (uint256[2]);
 	function GetNCurve() public pure returns (uint256);
 	function GetPCurve() public pure returns (uint256);
-	function GetGHVector(uint256 length) public constant returns (uint256[] Gxi, uint256[] Gyi, uint256[] Hxi, uint256[] Hyi);
+	function GetGHVector(uint256 length) public constant returns (uint256[] Gi, uint256[] Hi);
 	
 	//Base EC Functions
 	function Negate(uint256[2] p1) public pure returns (uint256[2] p2);
@@ -25,12 +25,17 @@ contract ECMath {
     function AddMultiply(uint256[2] p_add, uint256[2] p_mul, uint256 s) public constant returns (uint256[2] p0); //Returns p0 = p_add + s*p_mul
 	function AddMultiplyG1(uint256[2] p_add, uint256 s) public constant returns (uint256[2] p0); //Returns p0 = p_add + s*G1
     function AddMultiplyH(uint256[2] p_add, uint256 s) public constant returns (uint256[2] p0); //Returns p0 = p_add + s*H
-    function CommitG1H(uint256 s_G1, uint256 s_H) public constant returns (uint256[2] p0);
+    function CommitG1H(uint256 s_G1, uint256 s_H) public constant returns (uint256[2] p0); //Returns s_G1*G1 + s_H*H
 	
-	//Returns px = x[0]*Gi[0] + x[1]*Gi[1] + ... + x[n-1]*Gi[n-1]
-    //    and py = y[0]*Hi[0] + y[1]*Hi[1] + ... + y[n-1]*Hi[n-1]
-	function CommitGxHx(uint256[] x, uint256[] y) public constant returns (uint256[2] px, uint256[2] py);
+	//Vector Functions
+	function VectorScale(uint256[] X, uint256 s) public constant returns (uint256[] Z);
+	function VectorAdd(uint256[] X, uint256[] Y) public constant returns (uint256[] Z);
+	function VectorMul(uint256[] X, uint256[] s) public constant returns (uint256[] Z);
 	
+	//Returns px = x[0]*X[0] + x[1]*X[1] + ... + x[n-1]*X[n-1]
+    //    and py = y[0]*Y[0] + y[1]*Y[1] + ... + y[n-1]*Y[n-1]
+    function CommitAB(uint256[] X, uint256[] Y, uint256[] x, uint256[] y) public constant returns (uint256[2] px, uint256[2] py);
+        
 	//Point Compression and Expansion Functions
 	function CompressPoint(uint256[2] Pin) public pure returns (uint256 Pout);
 	function EvaluateCurve(uint256 x) public constant returns (uint256 y, bool onCurve);

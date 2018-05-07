@@ -16,10 +16,34 @@ def GenBasePoints(N):
         Hi[i] = point
 
     return (Gi, Hi)
+	
+def SerializeBasePoints():
+	print("Gi:")
+	for i in range(0, len(Gi)):
+		print(point_to_str(Gi[i]) + ",")
+	
+	print()
+	print("Hi:")
+	for i in range(0, len(Hi)):
+		print(point_to_str(Hi[i]) + ",")
+
+def CheckBasePoints():
+    for i in range(0, len(Gi)):
+        if (is_on_curve(Gi[i], 3)):
+            print("Gi[" + str(i) + "] passes!")
+        else:
+            print("Gi[" + str(i) + "] fails!")
+
+    for i in range(0, len(Hi)):
+        if (is_on_curve(Hi[i], 3)):
+            print("Hi[" + str(i) + "] passes!")
+        else:
+            print("Hi[" + str(i) + "] fails!")		
 
 print("Calculating Gi and Hi base points...", end="")
-(Gi, Hi) = GenBasePoints(64)
+(Gi, Hi) = GenBasePoints(32)
 print("Done!")
+SerializeBasePoints()
 
 def sNeg(a):
     return (Ncurve - (a % Ncurve)) % Ncurve
@@ -62,7 +86,7 @@ def sInv(a):
     assert(sMul(a, t1) == 1)
     return t1
 
-def vPowers(x, N):
+def vPow(x, N):
     if (x == 0):
         return [0]*N
     elif (x == 1):
@@ -75,10 +99,10 @@ def vPowers(x, N):
 
     return out
 
-def vSum(x):
-    out = x[0]
-    for i in range(1, len(x)):
-        out = sAdd(out, x[i])
+def vSum(a):
+    out = a[0]
+    for i in range(1, len(a)):
+        out = sAdd(out, a[i])
 
     return out
 
@@ -248,13 +272,15 @@ class BulletProof:
         hasher.update(int_to_bytes32(S[1].n))
         y = bytes_to_int(hasher.digest()) % Ncurve
         hasher.update(int_to_bytes32(y))
+
+        hasher = sha3.keccak_256(int_to_bytes32(y))
         z = bytes_to_int(hasher.digest()) % Ncurve
-        hasher.update(int_to_bytes32(z))
+        hasher = sha3.keccak_256(int_to_bytes32(z))
 
         #Calculate k
-        vp2 = vPowers(2, N)
-        vpy = vPowers(y, N)
-        vpyi = vPowers(sInv(y),N)
+        vp2 = vPow(2, N)
+        vpy = vPow(y, N)
+        vpyi = vPow(sInv(y),N)
         k = sAdd(sMul(sSq(z), vSum(vpy)), sMul(sPow(z,3), vSum(vp2)))
         k = sNeg(k)
         
@@ -279,7 +305,7 @@ class BulletProof:
         hasher.update(int_to_bytes32(T2[0].n))
         hasher.update(int_to_bytes32(T2[1].n))
         x = bytes_to_int(hasher.digest()) % Ncurve
-        hasher.update(int_to_bytes32(x))
+        hasher = sha3.keccak_256(int_to_bytes32(x))
 
         #Calculate taux and mu
         taux = sMul(tau1, x)
@@ -300,7 +326,7 @@ class BulletProof:
         hasher.update(int_to_bytes32(mu))
         hasher.update(int_to_bytes32(t))
         x_ip = bytes_to_int(hasher.digest()) % Ncurve
-        #hasher.update(int_to_bytes32(x_ip))
+        hasher = sha3.keccak_256(int_to_bytes32(x_ip))
 
         #Intialize arrays
         Gprime = Gi[:N]
@@ -340,6 +366,7 @@ class BulletProof:
             hasher.update(int_to_bytes32(R[rounds][0].n))
             hasher.update(int_to_bytes32(R[rounds][1].n))
             w[rounds] = bytes_to_int(hasher.digest()) % Ncurve
+            hasher = sha3.keccak_256(int_to_bytes32(w[rounds]))
 
             #Update Gprime, Hprime, aprime, and bprime
             Gprime = pvAdd(pvScale(gp1, sInv(w[rounds])), pvScale(gp2, w[rounds]))
@@ -380,24 +407,28 @@ class BulletProof:
         hasher.update(int_to_bytes32(self.S[0].n))
         hasher.update(int_to_bytes32(self.S[1].n))
         y = bytes_to_int(hasher.digest()) % Ncurve
-        hasher.update(int_to_bytes32(y))
+        hasher = sha3.keccak_256(int_to_bytes32(y))
+        
         z = bytes_to_int(hasher.digest()) % Ncurve
-        hasher.update(int_to_bytes32(z))
+        hasher = sha3.keccak_256(int_to_bytes32(z))
+        
         hasher.update(int_to_bytes32(self.T1[0].n))
         hasher.update(int_to_bytes32(self.T1[1].n))
         hasher.update(int_to_bytes32(self.T2[0].n))
         hasher.update(int_to_bytes32(self.T2[1].n))
         x = bytes_to_int(hasher.digest()) % Ncurve
-        hasher.update(int_to_bytes32(x))
+        hasher = sha3.keccak_256(int_to_bytes32(x))
+        
         hasher.update(int_to_bytes32(self.taux))
         hasher.update(int_to_bytes32(self.mu))
         hasher.update(int_to_bytes32(self.t))
         x_ip = bytes_to_int(hasher.digest()) % Ncurve
+        hasher = sha3.keccak_256(int_to_bytes32(x_ip))
 
         #Calculate k
-        vp2 = vPowers(2, N)
-        vpy = vPowers(y, N)
-        vpyi = vPowers(sInv(y),N)
+        vp2 = vPow(2, N)
+        vpy = vPow(y, N)
+        vpyi = vPow(sInv(y),N)
         k = sAdd(sMul(sSq(z), vSum(vpy)), sMul(sPow(z,3), vSum(vp2)))
         k = sNeg(k)
 
@@ -431,6 +462,7 @@ class BulletProof:
             hasher.update(int_to_bytes32(self.R[i][0].n))
             hasher.update(int_to_bytes32(self.R[i][1].n))
             w[i] = bytes_to_int(hasher.digest()) % Ncurve
+            hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
             #Debug Printing
             #print("w[" + str(i) + "]: " + hex(w[i]))
@@ -502,10 +534,50 @@ class BulletProof:
         print("t:    " + hex(self.t))
         print()
 
+    def Print_Serialized(self):
+        print("Bullet Proof:")
+        print("[" + hex(self.V[0].n) + ",")
+        print(hex(self.V[1].n) + ",")
+        print(hex(self.A[0].n) + ",")
+        print(hex(self.A[1].n) + ",")
+        print(hex(self.S[0].n) + ",")
+        print(hex(self.S[1].n) + ",")
+        print(hex(self.T1[0].n) + ",")
+        print(hex(self.T1[1].n) + ",")
+        print(hex(self.T2[0].n) + ",")
+        print(hex(self.T2[1].n) + ",")
+        print(hex(self.taux) + ",")
+        print(hex(self.mu) + ",")
+        print(str(len(self.L)) + ",")
+        print(str(len(self.R)) + ",")
 
-print("Creating Bulletproof")
-bp = BulletProof.Prove(13, getRandom())
-bp.Print()
+        for i in range(0, len(self.L)):
+            print(hex(self.L[i][0].n) + ",")
+            print(hex(self.L[i][1].n) + ",")
 
-print("Verifying Bulletproof")
-print(bp.Verify())
+        for i in range(0, len(self.R)):
+            print(hex(self.R[i][0].n) + ",")
+            print(hex(self.R[i][1].n) + ",")
+
+        print(hex(self.a) + ",")
+        print(hex(self.b) + ",")
+        print(hex(self.t) + "]")
+
+    def Print_MEW(self):
+        print("Bullet Proof:")
+        print("V:")
+        print(point_to_str(self.V))
+
+
+def BulletProofTest():
+    print()
+    print("Creating Bulletproof")
+    bp = BulletProof.Prove(13, 4)
+    bp.Print()
+
+    print("Verifying Bulletproof")
+    print(bp.Verify())
+    bp.Print_Serialized()
+    return bp
+
+bp = BulletProofTest()

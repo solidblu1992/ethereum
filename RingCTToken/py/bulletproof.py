@@ -173,6 +173,15 @@ def pvScale(A, s):
 
     return out
 
+def pvMul(A, a):
+    assert(len(A) == len(a))
+
+    out = [None]*len(A)
+    for i in range(0, len(A)):
+        out[i] = multiply(A[i], a[i])
+
+    return out
+
 class BulletProof:
     V = []
     A = []
@@ -243,20 +252,21 @@ class BulletProof:
         hasher.update(int_to_bytes32(z))
 
         #Calculate k
-        vec_pow_2 = vPowers(2, N)
-        vec_pow_y = vPowers(y, N)
-        k = sAdd(sMul(sSq(z), vSum(vec_pow_y)), sMul(sPow(z,3), vSum(vec_pow_2)))
+        vp2 = vPowers(2, N)
+        vpy = vPowers(y, N)
+        vpyi = vPowers(sInv(y),N)
+        k = sAdd(sMul(sSq(z), vSum(vpy)), sMul(sPow(z,3), vSum(vp2)))
         k = sNeg(k)
         
         #Calculate t0, not used
-        #t0 = sMul(z, vSum(vec_pow_y))
+        #t0 = sMul(z, vSum(vpy))
         #t0 = sAdd(t0, sMul(sSq(z), v))
         #t0 = sAdd(t0, k)
 
         #Calculate T1 and T2
-        t1 = vDot(vSub(aL, [z]*N), vMul(vec_pow_y, sR))
-        t1 = sAdd(t1, vDot(sL, vAdd(vMul(vec_pow_y, vAdd(aR, [z]*N)), vScale(vec_pow_2, sSq(z)))))
-        t2 = vDot(sL, vMul(vec_pow_y, sR))
+        t1 = vDot(vSub(aL, [z]*N), vMul(vpy, sR))
+        t1 = sAdd(t1, vDot(sL, vAdd(vMul(vpy, vAdd(aR, [z]*N)), vScale(vp2, sSq(z)))))
+        t2 = vDot(sL, vMul(vpy, sR))
 
         tau1 = getRandom()
         tau2 = getRandom()
@@ -281,8 +291,8 @@ class BulletProof:
         l = [0]*N
         r = [0]*N
         l = vAdd(vSub(aL, [z]*N), vScale(sL, x))
-        r = vAdd(vMul(vec_pow_y, vAdd(aR, vAdd([z]*N, vScale(sR, x)))),
-                       vScale(vec_pow_2, sSq(z)))
+        r = vAdd(vMul(vpy, vAdd(aR, vAdd([z]*N, vScale(sR, x)))),
+                       vScale(vp2, sSq(z)))
         t = vDot(l, r)
 
         #Continue hasher for Fiat-Shamir
@@ -293,16 +303,11 @@ class BulletProof:
         #hasher.update(int_to_bytes32(x_ip))
 
         #Intialize arrays
-        Gprime = [None]*N
-        Hprime = [None]*N
-        aprime = [0]*N
-        bprime = [0]*N
-        for i in range(0, N):
-            Gprime[i] = Gi[i]
-            Hprime[i] = multiply(Hi[i], sPow(sInv(y), i))
-            aprime[i] = l[i]
-            bprime[i] = r[i]
-
+        Gprime = Gi[:N]
+        aprime = l
+        bprime = r
+        Hprime = pvMul(Hi[:N], vpyi)
+        
         L = [None]*logN
         R = [None]*logN
         w = [0]*logN
@@ -312,19 +317,22 @@ class BulletProof:
         while (nprime > 1):
             #Halve the vector sizes
             nprime = nprime // 2
-            
-            #Calculate L and R
-            cL = vDot(vSlice(aprime, 0, nprime), vSlice(bprime, nprime, len(bprime)))
-            cR = vDot(vSlice(bprime, 0, nprime), vSlice(aprime, nprime, len(aprime)))
 
-            L[rounds] = pvExpCustom(vSlice(Gprime, nprime, len(Gprime)), vSlice(Hprime, 0, nprime),
-                                    vSlice(aprime, 0, nprime),           vSlice(bprime, nprime, len(bprime)))
-            
-            R[rounds] = pvExpCustom(vSlice(Gprime, 0, nprime),           vSlice(Hprime, nprime, len(Hprime)),
-                                    vSlice(aprime, nprime, len(aprime)), vSlice(bprime, 0, nprime))
-									  
-            L[rounds] = add(L[rounds], multiply(H, sMul(cL, x_ip)))
-            R[rounds] = add(R[rounds], multiply(H, sMul(cR, x_ip)))
+            ap1 = vSlice(aprime, 0, nprime)
+            ap2 = vSlice(aprime, nprime, len(aprime))
+            bp1 = vSlice(bprime, 0, nprime)
+            bp2 = vSlice(bprime, nprime, len(bprime))
+            gp1 = vSlice(Gprime, 0, nprime)
+            gp2 = vSlice(Gprime, nprime, len(Gprime))
+            hp1 = vSlice(Hprime, 0, nprime)
+            hp2 = vSlice(Hprime, nprime, len(Hprime))
+			
+            #Calculate L and R
+            cL = vDot(ap1, bp2)
+            cR = vDot(bp1, ap2)
+
+            L[rounds] = add(pvExpCustom(gp2, hp1, ap1, bp2), multiply(H, sMul(cL, x_ip)))
+            R[rounds] = add(pvExpCustom(gp1, hp2, ap2, bp1), multiply(H, sMul(cR, x_ip)))
 
             #Update hasher for Fiat-Shamir
             hasher.update(int_to_bytes32(L[rounds][0].n))
@@ -334,11 +342,11 @@ class BulletProof:
             w[rounds] = bytes_to_int(hasher.digest()) % Ncurve
 
             #Update Gprime, Hprime, aprime, and bprime
-            Gprime = pvAdd(pvScale(vSlice(Gprime, 0, nprime), sInv(w[rounds])),   pvScale(vSlice(Gprime, nprime, len(Gprime)), w[rounds]))
-            Hprime = pvAdd(pvScale(vSlice(Hprime, 0, nprime), w[rounds]),         pvScale(vSlice(Hprime, nprime, len(Hprime)), sInv(w[rounds])))
+            Gprime = pvAdd(pvScale(gp1, sInv(w[rounds])), pvScale(gp2, w[rounds]))
+            Hprime = pvAdd(pvScale(hp1, w[rounds]), pvScale(hp2, sInv(w[rounds])))
 
-            aprime = vAdd(vScale(vSlice(aprime, 0, nprime), w[rounds]),         vScale(vSlice(aprime, nprime, len(aprime)), sInv(w[rounds])))
-            bprime = vAdd(vScale(vSlice(bprime, 0, nprime), sInv(w[rounds])),   vScale(vSlice(bprime, nprime, len(bprime)), w[rounds]))
+            aprime = vAdd(vScale(ap1, w[rounds]), vScale(ap2, sInv(w[rounds])))
+            bprime = vAdd(vScale(bp1, sInv(w[rounds])), vScale(bp2, w[rounds]))
 
             rounds = rounds + 1
 
@@ -387,9 +395,10 @@ class BulletProof:
         x_ip = bytes_to_int(hasher.digest()) % Ncurve
 
         #Calculate k
-        vec_pow_2 = vPowers(2, N)
-        vec_pow_y = vPowers(y, N)
-        k = sAdd(sMul(sSq(z), vSum(vec_pow_y)), sMul(sPow(z,3), vSum(vec_pow_2)))
+        vp2 = vPowers(2, N)
+        vpy = vPowers(y, N)
+        vpyi = vPowers(sInv(y),N)
+        k = sAdd(sMul(sSq(z), vSum(vpy)), sMul(sPow(z,3), vSum(vp2)))
         k = sNeg(k)
 
         #Debug Printing
@@ -403,7 +412,7 @@ class BulletProof:
 
         #Check V, T1, T2
         L61Left = add(multiply(G1, self.taux), multiply(H, self.t))
-        L61Right = multiply(H, sAdd(k, sMul(z, vSum(vec_pow_y))))
+        L61Right = multiply(H, sAdd(k, sMul(z, vSum(vpy))))
         L61Right = add(L61Right, multiply(self.V, sSq(z)))
         L61Right = add(L61Right, multiply(self.T1, x))
         L61Right = add(L61Right, multiply(self.T2, sSq(x)))
@@ -431,7 +440,7 @@ class BulletProof:
         InnerProdH = None
         for i in range(0, N):
             gScalar = self.a
-            hScalar = sMul(self.b, sPow(sInv(y), i))
+            hScalar = sMul(self.b, vpyi[i])
 
             for J in range(0, rounds):
                 j = rounds - J - 1
@@ -444,8 +453,8 @@ class BulletProof:
                     hScalar = sMul(hScalar, sInv(w[J]))
 
             gScalar = sAdd(gScalar, z)
-            hScalar = sSub(hScalar, sMul(sAdd(sMul(z, sPow(y, i)), sMul(sSq(z), sPow(2, i))), sPow(sInv(y), i)))
-
+            hScalar = sSub(hScalar, sMul( sAdd(sMul(z, vpy[i]), sMul(sSq(z), vp2[i]) ), vpyi[i]) )
+            
             InnerProdG = add(InnerProdG, multiply(Gi[i], gScalar))
             InnerProdH = add(InnerProdH, multiply(Hi[i], hScalar))
 
@@ -495,7 +504,7 @@ class BulletProof:
 
 
 print("Creating Bulletproof")
-bp = BulletProof.Prove(13, getRandom(), 4)
+bp = BulletProof.Prove(13, getRandom())
 bp.Print()
 
 print("Verifying Bulletproof")

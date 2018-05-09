@@ -5,22 +5,16 @@ import "./ECMathInterface.sol";
 import "./libBulletproofStruct.sol";
 
 contract BulletproofVerify is ECMathInterface {
-    uint256[] public Gi;
-    uint256[] public Hi;
     uint256 public maxN;
 	uint256 private NCurve;
 
 	//Contstructor Function - Initializes Prerequisite Contract(s)
-	constructor(address _ecMathAddr, uint256 logN) public {
-	    maxN = 2**logN;
-	    
-	    ECMathInterface(_ecMathAddr);
+	constructor(address _ecMathAddr) ECMathInterface(_ecMathAddr) public {
 	    RefreshECMathParameters();
 	}
 	
-	function RefreshECMathParameters() requireECMath public {
+	function RefreshECMathParameters() ownerOnly requireECMath public {
 	    NCurve = ecMath.GetNCurve();
-	    (Gi, Hi) = ecMath.GetGHVector(maxN);
 	}
     
 	//Verify single bullet proof
@@ -30,23 +24,29 @@ contract BulletproofVerify is ECMathInterface {
 		uint256 z;
 		uint256 k;
 		uint256 x_ip;
+		uint256 logN;
 		uint256 N;
 		uint256[] vp2;
 		uint256[] vpy;
 		uint256[] vpyi;
+		uint256[] w;
+		uint256[] Gi;
+		uint256[] Hi;
 		uint256[2] Left;
 		uint256[2] Right;
 	}
 	
-	function VerifyBulletproof(BulletproofStruct.Data bp) internal constant returns (bool) {
+	function VerifyBulletproof(BulletproofStruct.Data bp)
+	    internal constant requireECMath returns (bool) {
 		//Check input array lengths
-		require(bp.L.length > 1);
-		require(bp.L.length % 2 == 0);
-		require(bp.R.length == bp.L.length);
+		if(bp.L.length < 2) return false;
+		if(bp.L.length % 2 != 0) return false;
+		if(bp.R.length != bp.L.length) return false;
 		
 		Variables memory v;
-		v.N = 2**bp.L.length;
-		require(v.N <= maxN);
+		v.logN = bp.L.length / 2;
+		v.N = 2**(v.logN);
+		if(v.N > ecMath.GetGiHiLength()) return false;
 		
 		//Start hashing for Fiat-Shamir
 		v.y = uint256(keccak256(	bp.V[0], bp.V[1],
@@ -75,10 +75,30 @@ contract BulletproofVerify is ECMathInterface {
 		v.Right = ecMath.AddMultiply(v.Right, bp.T1, v.x);
 		v.Right = ecMath.AddMultiply(v.Right, bp.T2, sSq(v.x));
 		
-		return ecMath.Equals(v.Left, v.Right);
+		if (!ecMath.Equals(v.Left, v.Right)) return false;
+		
+		//Generate w challenges
+		uint256 i;
+		uint256 index;
+		v.w = new uint256[](v.logN);
+		v.w[0] = uint256(keccak256(	v.x_ip,
+									bp.L[0], bp.L[1],
+									bp.R[0], bp.R[1])) % NCurve;
+									
+		for (i = 1; i < v.logN; i++) {
+		    index = 2*i;
+		    v.w[i] = uint256(keccak256(	v.w[i-1],
+									    bp.L[index], bp.L[index+1],
+									    bp.R[index], bp.R[index+1])) % NCurve;
+		}
+		
+		//Fetch Gi and Hi base points
+		(v.Gi, v.Hi) = ecMath.GetGiHi(v.N);
+		
+		return (v.Gi[2*v.N-1] == v.Gi[2*v.N-1]);
 	}
 	
-	function VerifyBulletproof(uint256[] argsSerialized) public constant returns (bool) {
+	function VerifyBulletproof(uint256[] argsSerialized) public returns (bool) {
 		return VerifyBulletproof(BulletproofStruct.Deserialize(argsSerialized));
 	}
 	

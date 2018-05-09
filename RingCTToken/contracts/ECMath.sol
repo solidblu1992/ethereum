@@ -7,6 +7,8 @@ contract ECMath is Debuggable {
 	uint256[2] private G1;
 	uint256[2] private H;
 	uint256[2] private Inf;
+	uint256[] private Gi;
+	uint256[] private Hi;
 	uint256 constant private NCurve = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
 	uint256 constant private PCurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
 
@@ -14,11 +16,13 @@ contract ECMath is Debuggable {
 	uint256 constant private ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000;
 	uint256 constant private a = 0xc19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52; // (p+1)/4
 	
-	constructor() public {
+	constructor(uint256 N) public {
         G1 = [uint256(1), 2];
     	H = HashToPoint(G1);
 		
 		Inf = [uint256(0), 0];
+		
+		GenerateBasePointVectors(N);
 	}
 	
 	//Base EC Parameters
@@ -28,25 +32,75 @@ contract ECMath is Debuggable {
 	function GetNCurve() public pure returns (uint256) { return NCurve; }
 	function GetPCurve() public pure returns (uint256) { return PCurve; }
 	
-	function GetGHVector(uint256 length)
-		public constant returns (uint256[] Gi, uint256[] Hi)
+	function GetGiHi(uint256 N)
+		public constant returns (uint256[], uint256[])
 	{
-	    require(length > 0);
-	    Gi = new uint256[](length*2);
-		Hi = new uint256[](length*2);
-	    
-	    uint256 index;
-		uint256[2] memory temp;
-		
-		temp = H;
-		for (uint256 i = 0; i < length; i++) {
-		    index = 2*i;
-			temp = HashToPoint(temp);
-			(Gi[index], Gi[index+1]) = (temp[0], temp[1]);
-			
-			temp = HashToPoint(temp);
-			(Hi[index], Hi[index+1]) = (temp[0], temp[1]);
-		}
+	    //Base points must have been generated first
+	    uint256 len = 2*N;
+        require(Gi.length >= len);
+        
+        //If length matches exactly then the whole vector can be sent
+        //If length = 0 is requested, send the whole vector as well
+        if (len == 0 || Gi.length == len) {
+            return (Gi, Hi);
+        }
+        //Else, slice vector
+        else {
+            uint256[] memory Gi_out = new uint256[](len);
+            uint256[] memory Hi_out = new uint256[](len);
+            uint256 i;
+            for (i = 0; i < len; i++) {
+                Gi_out[i] = Gi[i];
+                Hi_out[i] = Hi[i];
+            }
+            
+            return (Gi_out, Hi_out);
+        }
+	}
+	
+	function GetGiHiLength() public view returns (uint256) {
+	    return (Gi.length / 2);
+	}
+	
+	//Generate Gi and Hi points.
+	//Each is created from HashToPoint of another generator point:
+	//G1 -> H -> Gi[0] -> Hi[0] -> Gi[1] -> Hi[1] -> ...
+	function GenerateBasePointVectors(uint256 N) ownerOnly public {
+	    uint256 existing = (Gi.length / 2);
+	    if (N > existing) {
+	        uint256[] memory Gi_new = new uint256[](N*2);
+	        uint256[] memory Hi_new = new uint256[](N*2);
+	        
+	        uint256 i;
+	        //Copy existing base points
+	        for (i = 0; i < Gi.length; i++) {
+	            Gi_new[i] = Gi[i];
+	            Hi_new[i] = Hi[i];
+	        }
+	        
+	        //Create new points, store starting point in temp
+	        uint256 index;
+	        uint256[2] memory temp;
+	        if (existing == 0) {
+	            temp = H;
+	        }
+	        else {
+	            index = Hi.length-2;
+	            temp = [Hi[index], Hi[index+1]];
+	        }
+	        
+	        for (i = existing; i < N; i++) {
+	            index = 2*i;
+	            temp = HashToPoint(temp);
+	            (Gi_new[index], Gi_new[index+1]) = (temp[0], temp[1]);
+	            
+	            temp = HashToPoint(temp);
+	            (Hi_new[index], Hi_new[index+1]) = (temp[0], temp[1]);
+	        }
+	        
+	        Gi = Gi_new;
+	        Hi = Hi_new;
+	    }
 	}
 	
 	//Base EC Functions

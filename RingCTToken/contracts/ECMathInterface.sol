@@ -10,7 +10,8 @@ contract ECMath {
 	function GetInfinity() public view returns (uint256[2]);
 	function GetNCurve() public pure returns (uint256);
 	function GetPCurve() public pure returns (uint256);
-	function GetGHVector(uint256 length) public constant returns (uint256[] Gi, uint256[] Hi);
+	function GetGiHi(uint256 N) public constant returns (uint256[], uint256[]);
+	function GetGiHiLength() public view returns (uint256);
 	
 	//Base EC Functions
 	function Negate(uint256[2] p1) public pure returns (uint256[2] p2);

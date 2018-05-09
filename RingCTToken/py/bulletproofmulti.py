@@ -101,16 +101,20 @@ class BulletProofMulti:
         hasher = sha3.keccak_256(int_to_bytes32(z))
 
         #Calculate l0, l1, r0, and r1
+        vp2 = vPow(2, N)
         vpy = vPow(y, M*N)
         vpyi = vPow(sInv(y), M*N)
+        
         l0 = vSub(aL, [z]*(M*N))
         l1 = sL
 
         zerosTwos = [0]*(M*N)
         for i in range(0, M*N):
-            for j in range(1, N):
-                if (i >= (j-1)*N) and (i < j*N):
-                    zerosTwos[i] = sMul(sPow(z, j+1), sPow(2, i-(j-1)*N))
+            for j in range(1, M+1):
+                temp = 0
+                if (i >= ((j-1)*N)) and (i < (j*N)):
+                    temp = vp2[i-(j-1)*N]
+                zerosTwos[i] = sAdd(zerosTwos[i], sMul(sPow(z, j+1), temp))
 
         r0 = vAdd(aR, [z]*(M*N))
         r0 = vMul(r0, vpy)
@@ -137,7 +141,7 @@ class BulletProofMulti:
       
         #Calculate taux and mu
         taux = sAdd(sMul(tau1, x), sMul(tau2, sSq(x)))
-        for j in range(1, M):
+        for j in range(1, M+1):
             taux = sAdd(taux, sMul(sPow(z, j+1), gamma[j-1]))
         mu = sAdd(sMul(x, rho), alpha)
 
@@ -147,7 +151,6 @@ class BulletProofMulti:
         t = vDot(l, r)
 
         #Continue Fiat-Shamir
-        hasher.update(int_to_bytes32(x))
         hasher.update(int_to_bytes32(taux))
         hasher.update(int_to_bytes32(mu))
         hasher.update(int_to_bytes32(t))
@@ -203,6 +206,16 @@ class BulletProofMulti:
             bprime = vAdd(vScale(bp1, sInv(w[rounds])), vScale(bp2, w[rounds]))
 
             rounds = rounds + 1
+
+        #Debug Printing
+        print()
+        print("Bullet Proof Fiat-Shamir Challenges:")
+        print("y:    " + hex(y))
+        print("z:    " + hex(z))
+        print("x:    " + hex(x))
+        print("x_ip: " + hex(x_ip))
+        for i in range(0, len(w)):
+            print("w[" + str(i) + "]: " + hex(w[i]))
         
         return BulletProofMulti(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
 
@@ -220,17 +233,17 @@ class BulletProofMulti:
         maxMN = 2**maxLength
 
         #Initialize variables for checks
-        y0 = 0
-        y1 = 0
-        Y2 = None
-        Y3 = None
-        Y4 = None
-        Z0 = None
-        z1 = 0
-        Z2 = None
-        z3 = 0
-        z4 = [0]*maxMN
-        z5 = [0]*maxMN
+        y0 = 0              #taux
+        y1 = 0              #t-(k+z+Sum(y^i))
+        Y2 = None           #z-V sum
+        Y3 = None           #x*T1
+        Y4 = None           #x^2*T2
+        Z0 = None           #A + xS
+        z1 = 0              #mu
+        Z2 = None           #Li / Ri sum
+        z3 = 0              #(t-ab)*x_ip
+        z4 = [0]*maxMN      #g scalar sum
+        z5 = [0]*maxMN      #h scalar sum
 
         #Verify proofs
         for p in range(0, len(proofs)):
@@ -273,11 +286,10 @@ class BulletProofMulti:
             vp2 = vPow(2, proof.N)
             vpy = vPow(y, M*proof.N)
             vpyi = vPow(sInv(y), M*proof.N)
-            k = sMul(sSq(z), vSum(vpy))
             
-            for j in range(1, M):
+            k = sMul(sSq(z), vSum(vpy))
+            for j in range(1, M+1):
                 k = sAdd(k, sMul(sPow(z, j+2), vSum(vp2)))
-
             k = sNeg(k)
 
             #Compute inner product challenges
@@ -290,8 +302,18 @@ class BulletProofMulti:
                 w[i] = bytes_to_int(hasher.digest()) % Ncurve
                 hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
+            #Debug Printing
+            print()
+            print("Bullet Proof Fiat-Shamir Challenges:")
+            print("y:    " + hex(y))
+            print("z:    " + hex(z))
+            print("x:    " + hex(x))
+            print("x_ip: " + hex(x_ip))
+            for i in range(0, len(w)):
+                print("w[" + str(i) + "]: " + hex(w[i]))
+
             #Compute base point scalars
-            for i in range (0, M*proof.N):
+            for i in range(0, M*proof.N):
                 gScalar = proof.a
                 hScalar = sMul(proof.b, vpyi[i])
 
@@ -304,23 +326,27 @@ class BulletProofMulti:
                         gScalar = sMul(gScalar, w[J])
                         hScalar = sMul(hScalar, sInv(w[J]))
 
-                    gScalar = sAdd(gScalar, z)
-                    hScalar = sSub(hScalar, sMul(sMul(sAdd(sMul(z, vpy[i]), sPow(z, 2*i // proof.N)), vp2[i%proof.N]), vpyi[i]))
+                gScalar = sAdd(gScalar, z)
+                hScalar = sSub(hScalar, sMul(sMul(sAdd(sMul(z, vpy[i]), sPow(z, 2+(i//proof.N))), vp2[i%proof.N]), vpyi[i]))
 
-                    #Update z4 and z5 checks
-                    z4[i] = sAdd(z4[i], sMul(gScalar, weight))
-                    z5[i] = sAdd(z5[i], sMul(hScalar, weight))
+                #Update z4 and z5 checks for Stage 2
+                z4[i] = sAdd(z4[i], sMul(gScalar, weight))
+                z5[i] = sAdd(z5[i], sMul(hScalar, weight))
 
             #Apply weight to remaining checks (everything but z4 and z5)
+            #Stage 1 Checks
             y0 = sAdd(y0, sMul(proof.taux, weight))
             y1 = sAdd(y1, sMul(sSub(proof.t, sAdd(k, sMul(z, vSum(vpy)))), weight))
 
             temp = None
             for j in range(0, M):
                 temp = add(temp, multiply(proof.V[j], sPow(z, j+2)))
+                
             Y2 = add(Y2, multiply(temp, weight))
             Y3 = add(Y3, multiply(proof.T1, sMul(x, weight)))
             Y4 = add(Y4, multiply(proof.T2, sMul(sSq(x), weight)))
+
+            #Stage 2 Checks
             Z0 = add(Z0, multiply(add(proof.A, multiply(proof.S, x)), weight))
             z1 = sAdd(z1, sMul(proof.mu, weight))
 
@@ -336,17 +362,16 @@ class BulletProofMulti:
         Check1 = add(Check1, multiply(Y2, sNeg(1)))
         Check1 = add(Check1, multiply(Y3, sNeg(1)))
         Check1 = add(Check1, multiply(Y4, sNeg(1)))
-        if (Check1 == None):
+        if (Check1 != None):
             print("Stage 1 Check Failed!")
             return False
 
-        Check2 = Z0
-        Check2 = add(Check2, multiply(G1, sNeg(z1)))
+        Check2 = add(Z0, multiply(G1, sNeg(z1)))
         Check2 = add(Check2, Z2)
         Check2 = add(Check2, multiply(H, z3))
         for i in range(0, maxMN):
-            Check2 = add(multiply(Gi[i], sNeg(z4[i])))
-            Check2 = add(multiply(Hi[i], sneg(z5[i])))
+            Check2 = add(Check2, multiply(Gi[i], sNeg(z4[i])))
+            Check2 = add(Check2, multiply(Hi[i], sNeg(z5[i])))
 
         if (Check2 != None):
             print("Stage 2 Check Failed!")
@@ -431,7 +456,7 @@ class BulletProofMulti:
 def BulletProofMultiTest():
     print()
     print("Creating Bulletproof")
-    bp = BulletProofMulti.Prove([13, 4, 19, 3], getRandom(4), 8)
+    bp = BulletProofMulti.Prove([13, 4], getRandom(2), 8)
     bp.Print()
 
     print("Verifying Bulletproof")

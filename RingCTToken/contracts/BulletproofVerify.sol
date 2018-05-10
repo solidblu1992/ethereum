@@ -32,6 +32,7 @@ contract BulletproofVerify is ECMathInterface {
 		uint256[] vpy;
 		uint256[] vpyi;
 		uint256[] w;
+		uint256[] wi;
 		uint256[] Gi;
 		uint256[] Hi;
 		uint256 weight;
@@ -117,9 +118,12 @@ contract BulletproofVerify is ECMathInterface {
 	        
 	        //Compute inner product challenges
 	        v.w = new uint256[](v.logMN);
+	        v.wi = new uint256[](v.logMN);
+	        
     		v.w[0] = uint256(keccak256(	v.x_ip,
     									bp[p].L[0], bp[p].L[1],
     									bp[p].R[0], bp[p].R[1])) % NCurve;
+    		v.wi[0] = sInv(v.w[0]);
     									
 		    uint256 i;
     		uint256 index = 2;							
@@ -127,6 +131,8 @@ contract BulletproofVerify is ECMathInterface {
     		    v.w[i] = uint256(keccak256(	v.w[i-1],
     									    bp[p].L[index], bp[p].L[index+1],
     									    bp[p].R[index], bp[p].R[index+1])) % NCurve;
+    		    
+    		    v.wi[i] = sInv(v.w[i]);
 
     			index += 2;
     		}
@@ -141,12 +147,12 @@ contract BulletproofVerify is ECMathInterface {
 		            j = v.logMN - J - 1;
 		            
 		            if (i & (1 << j) == 0) {
-		                v.gs = sMul(v.gs, sInv(v.w[J]));
+		                v.gs = sMul(v.gs, v.wi[J]);
 		                v.hs = sMul(v.hs, v.w[J]);
 		            }
 		            else {
 		                v.gs = sMul(v.gs, v.w[J]);
-		                v.hs = sMul(v.hs, sInv(v.w[J]));
+		                v.hs = sMul(v.hs, v.wi[J]);
 		            }
 		        }
 		        
@@ -184,11 +190,11 @@ contract BulletproofVerify is ECMathInterface {
 		        v.z1 = bp[0].mu;
 		        
 		        v.Z2 = ecMath.Multiply([bp[0].L[0], bp[0].L[1]], sSq(v.w[0]));
-		        v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[0], bp[0].R[1]], sSq(sInv(v.w[0])));
+		        v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[0], bp[0].R[1]], sSq(v.wi[0]));
 		        index = 2;
 		        for (i = 1; i < v.logMN; i++) {
 		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].L[index], bp[0].L[index+1]], sSq(v.w[i]));
-		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[index], bp[0].R[index+1]], sSq(sInv(v.w[i])));
+		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[index], bp[0].R[index+1]], sSq(v.wi[i]));
 		            index += 2;
 		        }
 		        
@@ -213,11 +219,11 @@ contract BulletproofVerify is ECMathInterface {
 		        v.z1 = sAdd(v.z1, sMul(bp[p].mu, v.weight));
 		        
 		        v.point = ecMath.Multiply([bp[p].L[0], bp[p].L[1]], sSq(v.w[0]));
-		        v.point = ecMath.AddMultiply(v.point, [bp[p].R[0], bp[p].R[1]], sSq(sInv(v.w[0])));
+		        v.point = ecMath.AddMultiply(v.point, [bp[p].R[0], bp[p].R[1]], sSq(v.wi[0]));
 		        index = 2;
 		        for (i = 1; i < v.logMN; i++) {
 		            v.point = ecMath.AddMultiply(v.point, [bp[p].L[index], bp[p].L[index+1]], sSq(v.w[i]));
-		            v.point = ecMath.AddMultiply(v.point, [bp[p].R[index], bp[p].R[index+1]], sSq(sInv(v.w[i])));
+		            v.point = ecMath.AddMultiply(v.point, [bp[p].R[index], bp[p].R[index+1]], sSq(v.wi[i]));
 					index += 2;
 		        }
 		        v.Z2 = ecMath.AddMultiply(v.Z2, v.point, v.weight);

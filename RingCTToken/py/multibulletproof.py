@@ -513,7 +513,7 @@ def MultiBulletProofTest1():
     #Test verifying two bullet proofs with same number of commtiments and values of N
     print()
     print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13, 15], N=8)
+    bp1 = MultiBulletProof.Prove([13], N=8)
     bp1.Print()
 
     print("Verifying Multi Bulletproof 1")
@@ -521,7 +521,7 @@ def MultiBulletProofTest1():
 
     print()
     print("Creating Multi Bulletproof 2")
-    bp2 = MultiBulletProof.Prove([27, 7], N=8)
+    bp2 = MultiBulletProof.Prove([27], N=8)
     bp2.Print()
 
     print("Verifying Multi Bulletproof 2")
@@ -605,16 +605,4 @@ def MultiBulletProofTest4():
     print(MultiBulletProof.VerifyMulti(bp))
     return bp
 
-def MultiBulletProofTest5():
-    #Simple Test
-    print()
-    print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13, 4], N=8)
-    bp1.Print()
-
-    print("Verifying Multi Bulletproof 1")
-    print(bp1.Verify())
-    
-    return bp1
-
-bp = MultiBulletProofTest5()
+bp = MultiBulletProof.Prove([13, 4], N=16)

@@ -371,7 +371,7 @@ class SimpleBulletProof:
 def SimpleBulletProofTest():
     print()
     print("Creating Simple Bulletproof")
-    bp = SimpleBulletProof.Prove(13, N=8)
+    bp = SimpleBulletProof.Prove(1, N=2)
     bp.Print()
 
     print("Verifying Simple Bulletproof")

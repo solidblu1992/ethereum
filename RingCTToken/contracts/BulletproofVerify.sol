@@ -5,7 +5,6 @@ import "./ECMathInterface.sol";
 import "./libBulletproofStruct.sol";
 
 contract BulletproofVerify is ECMathInterface {
-    uint256 public maxN;
 	uint256 private NCurve;
 
 	//Contstructor Function - Initializes Prerequisite Contract(s)
@@ -24,82 +23,264 @@ contract BulletproofVerify is ECMathInterface {
 		uint256 z;
 		uint256 k;
 		uint256 x_ip;
-		uint256 logN;
-		uint256 N;
+		uint256 logMN;
+		uint256 maxMN;
+		uint256 M;
+		uint256 gs;
+		uint256 hs;
 		uint256[] vp2;
 		uint256[] vpy;
 		uint256[] vpyi;
 		uint256[] w;
 		uint256[] Gi;
 		uint256[] Hi;
-		uint256[2] Left;
-		uint256[2] Right;
+		uint256 weight;
+		uint256 y0;
+		uint256 y1;
+		uint256[2] Y2;
+		uint256[2] Y3;
+		uint256[2] Y4;
+		uint256[2] Z0;
+		uint256 z1;
+		uint256[2] Z2;
+		uint256 z3;
+		uint256[] z4;
+		uint256[] z5;
+		uint256[2] point;
 	}
 	
-	function VerifyBulletproof(BulletproofStruct.Data bp)
+	function VerifyBulletproof(BulletproofStruct.Data[] bp)
 	    internal constant requireECMath returns (bool) {
-		//Check input array lengths
-		if(bp.L.length < 2) return false;
-		if(bp.L.length % 2 != 0) return false;
-		if(bp.R.length != bp.L.length) return false;
+	    //Find longest proof
+	    Variables memory v;
+	    uint256 p;
+	    for (p = 0; p < bp.length; p++) {
+	        if (bp[p].L.length > v.maxMN) {
+	            v.maxMN = bp[p].L.length;
+	        }
+	    }
+	    v.maxMN = 2**(v.maxMN / 2);
+	    
+	    //Make sure we have enough Gi and Hi base points
+	    if(v.maxMN > ecMath.GetGiHiLength()) return false;
+	    
+	    //Fetch Gi and Hi base points
+		(v.Gi, v.Hi) = ecMath.GetGiHi(v.maxMN);
+	    
+	    //Initialize z4 and z5 checks
+	    v.z4 = new uint256[](v.maxMN);
+	    v.z5 = new uint256[](v.maxMN);
+	    
+	    //Populate check variables for each proof
+	    for (p = 0; p < bp.length; p++) {
+	        //Do input checks
+	        if (bp[p].V.length < 2) return false;
+	        if (bp[p].V.length % 2 != 0) return false;
+	        if (bp[p].L.length < 2) return false;
+	        if (bp[p].L.length % 2 != 0) return false;
+	        if (bp[p].R.length != bp[p].L.length) return false;
+	        
+	        v.logMN = (bp[p].L.length / 2);
+	        v.M = 2**(v.logMN) / bp[p].N;
+	        
+	        //Pick *random* weight, not sure if this works...
+	        //Probably need a better source of randomness
+	        if (bp.length > 1) {
+	            v.weight = uint256(keccak256(blockhash(p), gasleft(), v.weight)) % NCurve;
+	        }
+	        
+	        //Start hashing for Fiat-Shamir
+    		v.y = uint256(keccak256(	Keccak256OfArray(bp[p].V),
+    									bp[p].A[0], bp[p].A[1],
+    									bp[p].S[0], bp[p].S[1]	)) % NCurve;
+    											
+    		v.z = uint256(keccak256(	v.y	)) % NCurve;
+    		
+    		v.x = uint256(keccak256(	v.z,
+    									bp[p].T1[0], bp[p].T1[1],
+    									bp[p].T2[0], bp[p].T2[1]	)) % NCurve;
+    											
+    		v.x_ip = uint256(keccak256(	v.x,
+    									bp[p].taux, bp[p].mu, bp[p].t	)) % NCurve;
+	        
+	        //Calculate k
+	        v.vp2 = vPow(2, bp[p].N);
+	        v.vpy = vPow(v.y, v.M*bp[p].N);
+	        v.vpyi = vPow(sInv(v.y), v.M*bp[p].N);
+	        
+	        v.k = sMul(sSq(v.z), vSum(v.vpy));
+	        uint256 j;
+	        for (j = 1; j <= v.M; j++) {
+	            v.k = sAdd(v.k, sMul(sPow(v.z, j+2), vSum(v.vp2)));
+	        }
+	        v.k = sNeg(v.k);
+	        
+	        //Compute inner product challenges
+	        v.w = new uint256[](v.logMN);
+    		v.w[0] = uint256(keccak256(	v.x_ip,
+    									bp[p].L[0], bp[p].L[1],
+    									bp[p].R[0], bp[p].R[1])) % NCurve;
+    									
+		    uint256 i;
+    		uint256 index = 2;							
+    		for (i = 1; i < v.logMN; i++) {
+    		    v.w[i] = uint256(keccak256(	v.w[i-1],
+    									    bp[p].L[index], bp[p].L[index+1],
+    									    bp[p].R[index], bp[p].R[index+1])) % NCurve;
+
+    			index += 2;
+    		}
+		    
+		    //Compute base point scalars and calulcate z4 and z5
+		    for (i = 0; i < (v.M*bp[p].N); i++) {
+		        v.gs = bp[p].a;
+		        v.hs = sMul(bp[p].b, v.vpyi[i]);
+		        
+		        uint256 J;
+		        for (J = 0; J < v.logMN; J++) {
+		            j = v.logMN - J - 1;
+		            
+		            if (i & (1 << j) == 0) {
+		                v.gs = sMul(v.gs, sInv(v.w[J]));
+		                v.hs = sMul(v.hs, v.w[J]);
+		            }
+		            else {
+		                v.gs = sMul(v.gs, v.w[J]);
+		                v.hs = sMul(v.hs, sInv(v.w[J]));
+		            }
+		        }
+		        
+		        v.gs = sAdd(v.gs, v.z);
+		        v.hs = sSub(v.hs, sMul(sAdd(sMul(v.z, v.vpy[i]), sMul(sPow(v.z, 2+(i / bp[p].N)), v.vp2[i%bp[p].N])), v.vpyi[i]));
+		    
+		        //If only one proof, weights are not needed
+		        if (bp.length == 1) {
+		            v.z4[i] = sAdd(v.z4[i], v.gs);
+		            v.z5[i] = sAdd(v.z5[i], v.hs);
+		        }
+		        else {
+    		        v.z4[i] = sAdd(v.z4[i], sMul(v.gs, v.weight));
+    		        v.z5[i] = sAdd(v.z5[i], sMul(v.hs, v.weight));
+		        }
+		    }
+		    
+		    //Calculate y0, y1, Y2, Y3, Y4, Z0, z1, Z2, and z3 for checks
+		    //If only one proof, weights are not needed and some simplications can be made
+		    if (bp.length == 1) {
+		        v.y0 = bp[0].taux;
+		        v.y1 = sSub(bp[0].t, sAdd(v.k, sMul(v.z, vSum(v.vpy))));
+		        
+		        v.Y2 = ecMath.Multiply([bp[0].V[0], bp[0].V[1]], sSq(v.z));
+		        index = 2;
+		        for (j = 1; j < v.M; j++) {
+		            v.Y2 = ecMath.AddMultiply(v.Y2, [bp[0].V[index], bp[0].V[index+1]], sPow(v.z, j+2));
+		            index += 2;
+		        }
+		        
+		        v.Y3 = ecMath.Multiply(bp[0].T1, v.x);
+		        v.Y4 = ecMath.Multiply(bp[0].T2, sSq(v.x));
+		        
+		        v.Z0 = ecMath.AddMultiply(bp[0].A, bp[0].S, v.x);
+		        v.z1 = bp[0].mu;
+		        
+		        v.Z2 = ecMath.Multiply([bp[0].L[0], bp[0].L[1]], sSq(v.w[0]));
+		        v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[0], bp[0].R[1]], sSq(sInv(v.w[0])));
+		        index = 2;
+		        for (i = 1; i < v.logMN; i++) {
+		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].L[index], bp[0].L[index+1]], sSq(v.w[i]));
+		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[index], bp[0].R[index+1]], sSq(sInv(v.w[i])));
+		            index += 2;
+		        }
+		        
+		        v.z3 = sMul(sSub(bp[0].t, sMul(bp[0].a, bp[0].b)), v.x_ip);
+		    }
+		    else {
+		        v.y0 = sAdd(v.y0, sMul(bp[p].taux, v.weight));
+                v.y1 = sAdd(v.y1, sMul(sSub(bp[p].t, sAdd(v.k, sMul(v.z, vSum(v.vpy)))), v.weight));
+		    
+		        v.point = ecMath.Multiply([bp[p].V[0], bp[p].V[1]], sSq(v.z));
+		        index = 2;
+		        for (j = 1; j < v.M; j++) {
+		            v.point = ecMath.AddMultiply(v.point, [bp[p].V[index], bp[p].V[index+1]], sPow(v.z, j+2));
+		            index += 2;
+		        }
+		        v.Y2 = ecMath.AddMultiply(v.Y2, v.point, v.weight);
+		        
+		        v.Y3 = ecMath.AddMultiply(v.Y3, ecMath.Multiply(bp[p].T1, v.x), v.weight);
+		        v.Y4 = ecMath.AddMultiply(v.Y4, ecMath.Multiply(bp[p].T2, sSq(v.x)), v.weight);
+		    
+		        v.Z0 = ecMath.AddMultiply(v.Z0, ecMath.AddMultiply(bp[p].A, bp[p].S, v.x), v.weight);
+		        v.z1 = sAdd(v.z1, sMul(bp[p].mu, v.weight));
+		        
+		        v.point = ecMath.Multiply([bp[p].L[0], bp[p].L[1]], sSq(v.w[0]));
+		        v.point = ecMath.AddMultiply(v.point, [bp[p].R[0], bp[p].R[1]], sSq(sInv(v.w[0])));
+		        index = 2;
+		        for (i = 1; i < v.logMN; i++) {
+		            v.point = ecMath.AddMultiply(v.point, [bp[p].L[index], bp[p].L[index+1]], sSq(v.w[i]));
+		            v.point = ecMath.AddMultiply(v.point, [bp[p].R[index], bp[p].R[index+1]], sSq(sInv(v.w[i])));
+					index += 2;
+		        }
+		        v.Z2 = ecMath.AddMultiply(v.Z2, v.point, v.weight);
+		        
+		        v.z3 = sAdd(v.z3, sMul(sMul(sSub(bp[p].t, sMul(bp[p].a, bp[p].b)), v.x_ip), v.weight));
+		    }
+	    }
 		
-		Variables memory v;
-		v.logN = bp.L.length / 2;
-		v.N = 2**(v.logN);
-		if(v.N > ecMath.GetGiHiLength()) return false;
+		//Perform checks on all proof(s) at once
+		//Stage 1 Checks
+		v.point = ecMath.CommitG1H(v.y0, v.y1);
+		v.point = ecMath.Subtract(v.point, v.Y2);
+		v.point = ecMath.Subtract(v.point, v.Y3);
 		
-		//Start hashing for Fiat-Shamir
-		v.y = uint256(keccak256(	bp.V[0], bp.V[1],
-									bp.A[0], bp.A[1],
-									bp.S[0], bp.S[1]	)) % NCurve;
-											
-		v.z = uint256(keccak256(	v.y	)) % NCurve;
-		
-		v.x = uint256(keccak256(	v.z,
-									bp.T1[0], bp.T1[1],
-									bp.T2[0], bp.T2[1]	)) % NCurve;
-											
-		v.x_ip = uint256(keccak256(	v.x,
-									bp.taux, bp.mu, bp.t	)) % NCurve;
-		
-		//Check V, T1, T2, taux, and t
-		v.vp2 = vPow(2, v.N);
-		v.vpy = vPow(v.y, v.N);
-		v.vpyi = vPow(sInv(v.y), v.N);
-		v.k = sAdd(sMul(sSq(v.z), vSum(v.vpy)), sMul(sPow(v.z,3), vSum(v.vp2)));
-        v.k = sNeg(v.k);				
-		
-		v.Left = ecMath.CommitG1H(bp.taux, bp.t);
-		v.Right = ecMath.MultiplyH(sAdd(v.k, sMul(v.z, vSum(v.vpy))));
-		v.Right = ecMath.AddMultiply(v.Right, bp.V, sSq(v.z));
-		v.Right = ecMath.AddMultiply(v.Right, bp.T1, v.x);
-		v.Right = ecMath.AddMultiply(v.Right, bp.T2, sSq(v.x));
-		
-		if (!ecMath.Equals(v.Left, v.Right)) return false;
-		
-		//Generate w challenges
-		uint256 i;
-		uint256 index;
-		v.w = new uint256[](v.logN);
-		v.w[0] = uint256(keccak256(	v.x_ip,
-									bp.L[0], bp.L[1],
-									bp.R[0], bp.R[1])) % NCurve;
-									
-		for (i = 1; i < v.logN; i++) {
-		    index = 2*i;
-		    v.w[i] = uint256(keccak256(	v.w[i-1],
-									    bp.L[index], bp.L[index+1],
-									    bp.R[index], bp.R[index+1])) % NCurve;
+		if (!ecMath.Equals(v.point, v.Y4)) {
+		    /*emit DebugEvent("check1 failed!", 1);
+		    emit DebugEvent("y0", v.y0);
+		    emit DebugEvent("y1", v.y1);
+		    emit DebugEvent("Y2", ecMath.CompressPoint(v.Y2));
+		    emit DebugEvent("Y3", ecMath.CompressPoint(v.Y3));
+		    emit DebugEvent("Y4", ecMath.CompressPoint(v.Y4));*/
+		    return false;
 		}
 		
-		//Fetch Gi and Hi base points
-		(v.Gi, v.Hi) = ecMath.GetGiHi(v.N);
+		//Stage 2 Checks
+		v.point = ecMath.AddMultiplyG1(v.Z0, sNeg(v.z1));
+		v.point = ecMath.AddMultiplyH(v.point, v.z3);
 		
-		return (v.Gi[2*v.N-1] == v.Gi[2*v.N-1]);
+		index = 0;
+		for (i = 0; i < v.maxMN; i++) {
+		    v.point = ecMath.AddMultiply(v.point, [v.Gi[index], v.Gi[index+1]], sNeg(v.z4[i]));
+		    v.point = ecMath.AddMultiply(v.point, [v.Hi[index], v.Hi[index+1]], sNeg(v.z5[i]));
+		    index +=2;
+		}
+		
+		if (!ecMath.Equals(v.point, ecMath.Negate(v.Z2))) {
+		    /*emit DebugEvent("check2 failed!", 1);
+		    emit DebugEvent("Z0", ecMath.CompressPoint(v.Z0));
+		    emit DebugEvent("z1", v.z1);
+		    emit DebugEvent("Z2", ecMath.CompressPoint(v.Z2));
+		    emit DebugEvent("z3", v.z3);
+		    emit DebugEvent2("z4[]", v.z4);
+		    emit DebugEvent2("z5[]", v.z5);*/
+		    return false;
+		}
+		else {
+		    return true;
+		}
 	}
 	
-	function VerifyBulletproof(uint256[] argsSerialized) public returns (bool) {
+	function VerifyBulletproof(uint256[] argsSerialized) public view returns (bool) {
 		return VerifyBulletproof(BulletproofStruct.Deserialize(argsSerialized));
+	}
+	
+	function VerifyBulletproof_tx(uint256[] argsSerialized) public returns (bool) {
+	    if (VerifyBulletproof(BulletproofStruct.Deserialize(argsSerialized))) {
+	        emit DebugEvent("success!", 0);
+	        return true;
+	    }
+	    else {
+	        emit DebugEvent("failure!", 1);
+	        return false;
+	    }
 	}
 	
 	//Low level helper functions
@@ -250,9 +431,26 @@ contract BulletproofVerify is ECMathInterface {
 		require(end <= A.length);
 	
 		out = new uint256[](end-start);
-		for (uint256 i = start; i < end; i += 2) {
-		    (out[i-start], out[i-start+1]) = (A[i], A[i+1]);
+		for (uint256 i = start; i < end; i++) {
+		    out[i-start] = A[i];
 		}
 	}
+	
+    //Calculate keccak256 of given array
+    function Keccak256OfArray(uint256[] array)
+        public pure returns (uint256 out)
+    {
+        uint256 len = array.length + 1;
+        uint256[1] memory temp;
+        
+        //Construct c1 (store in c[0])
+    	assembly {
+    	    let p := mload(0x40)
+    	    mstore(p, mul(len, 0x20)) //0x20 = 32; 32 bytes for array length + 32 bytes per uint256
+    	    mstore(temp, keccak256(array, mload(p)))
+    	}
+    	
+    	out = temp[0];
+    }
 }
 

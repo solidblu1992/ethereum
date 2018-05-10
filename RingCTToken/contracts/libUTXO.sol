@@ -169,4 +169,12 @@ library UTXO {
 	        output_tx[i].encrypted_data[2] = output_encrypted_data[index+2];
 	    }
 	}
+	
+	function EchoTestInput(uint256[] argsSerialized) public constant returns (uint256[]) {
+	    return SerializeInputArray(DeserializeInputArray(argsSerialized));
+	}
+	
+	function EchoTestOutput(uint256[] argsSerialized) public constant returns (uint256[]) {
+	    return SerializeOutputArray(DeserializeOutputArray(argsSerialized));
+	}
 }

@@ -71,4 +71,8 @@ library VerifyPCRangeProofStruct {
 		    argsSerialized[index+i] = args.signature[i];
 		}
 	}
+	
+	function EchoTest(uint256[] argsSerialized) public constant returns (uint256[]) {
+	    return Serialize(Deserialize(argsSerialized));
+	}
 }

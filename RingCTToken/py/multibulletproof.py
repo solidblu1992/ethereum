@@ -36,7 +36,9 @@ class MultiBulletProof:
         if (gamma == None):
             gamma = getRandom(len(v))
             
-        assert(type(gamma) == list)
+        if(type(gamma) != list):
+            gamma = [gamma]
+            
         assert(len(v) == len(gamma))
 
         #Make sure M is a power of 2
@@ -90,14 +92,18 @@ class MultiBulletProof:
         S = add(pvExp(sL, sR), multiply(G1, rho))
 
         #Start hasher for Fiat-Shamir
-        hasher = sha3.keccak_256()
+	#Hash V[], including array length
+        hasher = sha3.keccak_256(int_to_bytes32(M*2))
         for j in range(0, M):
             hasher.update(int_to_bytes32(V[j][0].n))
             hasher.update(int_to_bytes32(V[j][1].n))
+
+        hasher = sha3.keccak_256(hasher.digest())
         hasher.update(int_to_bytes32(A[0].n))
         hasher.update(int_to_bytes32(A[1].n))
         hasher.update(int_to_bytes32(S[0].n))
         hasher.update(int_to_bytes32(S[1].n))
+	
         y = bytes_to_int(hasher.digest()) % Ncurve
         hasher = sha3.keccak_256(int_to_bytes32(y))
         
@@ -256,13 +262,18 @@ class MultiBulletProof:
             M = 2**(logMN) // proof.N
 
             #Pick weight for this proof
-            weight = getRandom()
+            #weight = getRandom()
+            weight = 1
 
             #Reconstruct Challenges
-            hasher = sha3.keccak_256()
+			#Hash V[], including array length
+            hasher = sha3.keccak_256(int_to_bytes32(M*2))
             for j in range(0, M):
                 hasher.update(int_to_bytes32(proof.V[j][0].n))
                 hasher.update(int_to_bytes32(proof.V[j][1].n))
+
+	    #Continue Hasher
+            hasher = sha3.keccak_256(hasher.digest())
             hasher.update(int_to_bytes32(proof.A[0].n))
             hasher.update(int_to_bytes32(proof.A[1].n))
             hasher.update(int_to_bytes32(proof.S[0].n))
@@ -315,6 +326,7 @@ class MultiBulletProof:
             #print("x_ip: " + hex(x_ip))
             #for i in range(0, len(w)):
             #    print("w[" + str(i) + "]: " + hex(w[i]))
+            #print("k:    " + hex(k))
 
             #Compute base point scalars
             for i in range(0, M*proof.N):
@@ -363,21 +375,35 @@ class MultiBulletProof:
 
         #Perform all Checks
         Check1 = add(multiply(G1, y0), multiply(H, y1))
-        Check1 = add(Check1, multiply(Y2, sNeg(1)))
-        Check1 = add(Check1, multiply(Y3, sNeg(1)))
-        Check1 = add(Check1, multiply(Y4, sNeg(1)))
-        if (Check1 != None):
+        Check1 = add(Check1, neg(Y2))
+        Check1 = add(Check1, neg(Y3))
+        if (not eq(Check1, Y4)):
             print("Stage 1 Check Failed!")
             return False
 
         Check2 = add(Z0, multiply(G1, sNeg(z1)))
-        Check2 = add(Check2, Z2)
         Check2 = add(Check2, multiply(H, z3))
         for i in range(0, maxMN):
             Check2 = add(Check2, multiply(Gi[i], sNeg(z4[i])))
             Check2 = add(Check2, multiply(Hi[i], sNeg(z5[i])))
 
-        if (Check2 != None):
+        #More Debug Printing
+        #print("y0: " + hex(y0))
+        #print("y1: " + hex(y1))
+        #print("Y2: " + hex(CompressPoint(Y2)))
+        #print("Y3: " + hex(CompressPoint(Y3)))
+        #print("Y4: " + hex(CompressPoint(Y4)))
+        #print()
+        #print("Z0: " + hex(CompressPoint(Z0)))
+        #print("z1: " + hex(z1))
+        #print("Z2: " + hex(CompressPoint(Z2)))
+        #print("z3: " + hex(z3))
+        #for i in range(0, len(z4)):
+        #    print("z4[" + str(i) + "]: " + hex(z4[i]))
+        #for i in range(0, len(z5)):
+        #    print("z5[" + str(i) + "]: " + hex(z5[i]))            
+
+        if (Check2 != neg(Z2)):
             print("Stage 2 Check Failed!")
             return False
         else:
@@ -415,7 +441,8 @@ class MultiBulletProof:
 
     def Print_Serialized(self):
         print("Multi Bullet Proof:")
-        print("[", end="")
+        print("[" + str(1) + "," + str(len(self.V*2)) + ",")
+        print(str(len(self.L*2)) + "," + str(len(self.R*2)) + ",")
         for i in range(0, len(self.V)):
             print(hex(self.V[i][0].n) + ",")
             print(hex(self.V[i][1].n) + ",")
@@ -429,8 +456,6 @@ class MultiBulletProof:
         print(hex(self.T2[1].n) + ",")
         print(hex(self.taux) + ",")
         print(hex(self.mu) + ",")
-        print(str(len(self.L)*2) + ",")
-        print(str(len(self.R)*2) + ",")
 
         for i in range(0, len(self.L)):
             print(hex(self.L[i][0].n) + ",")
@@ -443,19 +468,52 @@ class MultiBulletProof:
         print(hex(self.a) + ",")
         print(hex(self.b) + ",")
         print(hex(self.t) + ",")
-        print(hex(self.N) + "]")
+        print(str(self.N) + "]")
 
-    def Print_MEW(self):
-        print("Bullet Proof:")
-        print("V:")
-        print(point_to_str(self.V))
+    def Print_Multi_Serialized(proofs):
+        print("Multi Bullet Proof:")
+        print("[" + str(len(proofs)) + ",")
+        for i in range(0, len(proofs)):
+            if (i > 0):
+                print(",")
+                
+            print(str(len(proofs[i].V*2)) + ",")
+            print(str(len(proofs[i].L*2)) + "," + str(len(proofs[i].R*2)) + ",")
+            for i in range(0, len(proofs[i].V)):
+                print(hex(proofs[i].V[i][0].n) + ",")
+                print(hex(proofs[i].V[i][1].n) + ",")
+            print(hex(proofs[i].A[0].n) + ",")
+            print(hex(proofs[i].A[1].n) + ",")
+            print(hex(proofs[i].S[0].n) + ",")
+            print(hex(proofs[i].S[1].n) + ",")
+            print(hex(proofs[i].T1[0].n) + ",")
+            print(hex(proofs[i].T1[1].n) + ",")
+            print(hex(proofs[i].T2[0].n) + ",")
+            print(hex(proofs[i].T2[1].n) + ",")
+            print(hex(proofs[i].taux) + ",")
+            print(hex(proofs[i].mu) + ",")
+
+            for j in range(0, len(proofs[i].L)):
+                print(hex(proofs[i].L[j][0].n) + ",")
+                print(hex(proofs[i].L[j][1].n) + ",")
+
+            for j in range(0, len(proofs[i].R)):
+                print(hex(proofs[i].R[j][0].n) + ",")
+                print(hex(proofs[i].R[j][1].n) + ",")
+
+            print(hex(proofs[i].a) + ",")
+            print(hex(proofs[i].b) + ",")
+            print(hex(proofs[i].t) + ",")
+            print(str(proofs[i].N), end="")
+
+        print ("]")
 
 
 def MultiBulletProofTest1():
     #Test verifying two bullet proofs with same number of commtiments and values of N
     print()
     print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13, 4], N=8)
+    bp1 = MultiBulletProof.Prove([13, 15], N=8)
     bp1.Print()
 
     print("Verifying Multi Bulletproof 1")
@@ -463,7 +521,7 @@ def MultiBulletProofTest1():
 
     print()
     print("Creating Multi Bulletproof 2")
-    bp2 = MultiBulletProof.Prove([27, 1], N=8)
+    bp2 = MultiBulletProof.Prove([27, 7], N=8)
     bp2.Print()
 
     print("Verifying Multi Bulletproof 2")
@@ -547,4 +605,16 @@ def MultiBulletProofTest4():
     print(MultiBulletProof.VerifyMulti(bp))
     return bp
 
-bp = MultiBulletProofTest4()
+def MultiBulletProofTest5():
+    #Simple Test
+    print()
+    print("Creating Multi Bulletproof 1")
+    bp1 = MultiBulletProof.Prove([13, 4], N=8)
+    bp1.Print()
+
+    print("Verifying Multi Bulletproof 1")
+    print(bp1.Verify())
+    
+    return bp1
+
+bp = MultiBulletProofTest5()

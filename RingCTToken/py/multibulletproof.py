@@ -1,6 +1,6 @@
 from bulletproofutil import *
 
-class BulletProofMulti:
+class MultiBulletProof:
     V = [None]
     A = None
     S = None
@@ -30,8 +30,12 @@ class BulletProofMulti:
             self.t = t
             self.N = N
     
-    def Prove(v, gamma, N=32):
+    def Prove(v, gamma=None, N=32):
         assert(type(v) == list)
+
+        if (gamma == None):
+            gamma = getRandom(len(v))
+            
         assert(type(gamma) == list)
         assert(len(v) == len(gamma))
 
@@ -208,21 +212,21 @@ class BulletProofMulti:
             rounds = rounds + 1
 
         #Debug Printing
-        print()
-        print("Bullet Proof Fiat-Shamir Challenges:")
-        print("y:    " + hex(y))
-        print("z:    " + hex(z))
-        print("x:    " + hex(x))
-        print("x_ip: " + hex(x_ip))
-        for i in range(0, len(w)):
-            print("w[" + str(i) + "]: " + hex(w[i]))
+        #print()
+        #print("Bullet Proof Fiat-Shamir Challenges:")
+        #print("y:    " + hex(y))
+        #print("z:    " + hex(z))
+        #print("x:    " + hex(x))
+        #print("x_ip: " + hex(x_ip))
+        #for i in range(0, len(w)):
+        #    print("w[" + str(i) + "]: " + hex(w[i]))
         
-        return BulletProofMulti(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
+        return MultiBulletProof(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
 
     #Verify batch of proofs
     def VerifyMulti(proofs):
         assert (type(proofs) == list)
-        assert (type(proofs[0]) == BulletProofMulti)
+        assert (type(proofs[0]) == MultiBulletProof)
 
         #Find longest proof
         maxLength = 0
@@ -303,14 +307,14 @@ class BulletProofMulti:
                 hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
             #Debug Printing
-            print()
-            print("Bullet Proof Fiat-Shamir Challenges:")
-            print("y:    " + hex(y))
-            print("z:    " + hex(z))
-            print("x:    " + hex(x))
-            print("x_ip: " + hex(x_ip))
-            for i in range(0, len(w)):
-                print("w[" + str(i) + "]: " + hex(w[i]))
+            #print()
+            #print("Bullet Proof Fiat-Shamir Challenges:")
+            #print("y:    " + hex(y))
+            #print("z:    " + hex(z))
+            #print("x:    " + hex(x))
+            #print("x_ip: " + hex(x_ip))
+            #for i in range(0, len(w)):
+            #    print("w[" + str(i) + "]: " + hex(w[i]))
 
             #Compute base point scalars
             for i in range(0, M*proof.N):
@@ -327,7 +331,7 @@ class BulletProofMulti:
                         hScalar = sMul(hScalar, sInv(w[J]))
 
                 gScalar = sAdd(gScalar, z)
-                hScalar = sSub(hScalar, sMul(sMul(sAdd(sMul(z, vpy[i]), sPow(z, 2+(i//proof.N))), vp2[i%proof.N]), vpyi[i]))
+                hScalar = sSub(hScalar, sMul(sAdd(sMul(z, vpy[i]), sMul(sPow(z, 2+(i//proof.N)), vp2[i%proof.N])), vpyi[i]))
 
                 #Update z4 and z5 checks for Stage 2
                 z4[i] = sAdd(z4[i], sMul(gScalar, weight))
@@ -381,13 +385,11 @@ class BulletProofMulti:
         
     #On verify self, this is the only proof
     def Verify(self):
-        return BulletProofMulti.VerifyMulti([self])
+        return MultiBulletProof.VerifyMulti([self])
 
-    
-        
     def Print(self):
         print()
-        print("Bulletproof:")
+        print("Multi Bulletproof:")
         
         for i in range(0, len(self.V)):
             print("V[" + str(i) + "]: " + print_point(CompressPoint(self.V[i])))
@@ -399,24 +401,20 @@ class BulletProofMulti:
         print("taux: " + hex(self.taux))
         print("mu:   " + hex(self.mu))
 
-        print()
         for i in range(0, len(self.L)):
             print("L[" + str(i) + "]: " + print_point(CompressPoint(self.L[i])))
 
-        print()
         for i in range(0, len(self.R)):
             print("R[" + str(i) + "]: " + print_point(CompressPoint(self.R[i])))
 
-        print()
         print("a:    " + hex(self.a))
         print("b:    " + hex(self.b))
         print("t:    " + hex(self.t))
-        print()
         print("N:    " + str(self.N))
         print()
 
     def Print_Serialized(self):
-        print("Bullet Proof:")
+        print("Multi Bullet Proof:")
         print("[", end="")
         for i in range(0, len(self.V)):
             print(hex(self.V[i][0].n) + ",")
@@ -453,15 +451,27 @@ class BulletProofMulti:
         print(point_to_str(self.V))
 
 
-def BulletProofMultiTest():
+def MultiBulletProofTest():
     print()
-    print("Creating Bulletproof")
-    bp = BulletProofMulti.Prove([13, 4], getRandom(2), 8)
-    bp.Print()
+    print("Creating Multi Bulletproof 1")
+    bp1 = MultiBulletProof.Prove([13, 4], N=8)
+    bp1.Print()
 
-    print("Verifying Bulletproof")
-    print(bp.Verify())
-    #bp.Print_Serialized()
+    print("Verifying Multi Bulletproof 1")
+    print(bp1.Verify())
+
+    print()
+    print("Creating Multi Bulletproof 2")
+    bp2 = MultiBulletProof.Prove([27, 1], N=8)
+    bp2.Print()
+
+    print("Verifying Multi Bulletproof 2")
+    print(bp2.Verify())
+
+    print()
+    print("Verifying Both Multi Bulletproofs at Once")
+    bp = [bp1, bp2]
+    print(MultiBulletProof.VerifyMulti(bp))
     return bp
 
-bp = BulletProofMultiTest()
+bp = MultiBulletProofTest()

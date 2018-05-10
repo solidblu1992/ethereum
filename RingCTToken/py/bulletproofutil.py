@@ -3,13 +3,23 @@ from ring_signatures import *
 
 Gi = []
 Hi = []
-def GenBasePoints(N):
-    #Get curve Generator Points
-    Gi = [None]*N
-    Hi = [None]*N
+def GenBasePoints(N, Gi_old=None, Hi_old=None):
+    #Get curve Generator Points    
+    if (Gi_old != None) and (Hi_old != None):
+        N_old = min(len(Gi_old), len(Hi_old))
+        Gi = Gi_old[:N_old] + [None]*(N-N_old)
+        Hi = Hi_old[:N_old] + [None]*(N-N_old)
+    else:
+        N_old = 0
+        Gi = [None]*N
+        Hi = [None]*N
 
-    point = H
-    for i in range(0, N):
+    if (N_old == 0):
+        point = H
+    else:
+        point = Hi[N_old-1]
+
+    for i in range(N_old, N):
         point = hash_to_point(point)
         Gi[i] = point
         point = hash_to_point(point)
@@ -39,8 +49,6 @@ def CheckBasePoints():
             print("Hi[" + str(i) + "] passes!")
         else:
             print("Hi[" + str(i) + "] fails!")		
-
-(Gi, Hi) = GenBasePoints(32*4)
 
 def sNeg(a):
     return (Ncurve - (a % Ncurve)) % Ncurve
@@ -202,3 +210,6 @@ def pvMul(A, a):
         out[i] = multiply(A[i], a[i])
 
     return out
+
+#Generate Base Points
+(Gi, Hi) = GenBasePoints(128, Gi, Hi)

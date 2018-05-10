@@ -1,6 +1,6 @@
 from bulletproofutil import *
 
-class BulletProof:
+class SimpleBulletProof:
     V = None
     A = None
     S = None
@@ -28,8 +28,12 @@ class BulletProof:
             self.b = b
             self.t = t
     
-    def Prove(v, gamma, N=32):
+    def Prove(v, gamma=None, N=32):
         assert(type(v) != list)
+
+        if (gamma == None):
+            gamma = getRandom()
+        
         assert(type(gamma) != list)
         
         #Make sure N is a power of 2
@@ -186,7 +190,7 @@ class BulletProof:
         #for i in range(0, len(w)):
         #    print("w[" + str(i) + "]: " + hex(w[i]))
         
-        return BulletProof(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t)
+        return SimpleBulletProof(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t)
 
     def Verify(self):
         #Get N and logN
@@ -262,7 +266,7 @@ class BulletProof:
             hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
             #Debug Printing
-            print("w[" + str(i) + "]: " + hex(w[i]))
+            #print("w[" + str(i) + "]: " + hex(w[i]))
 
         #Calculate Inner Products
         InnerProdG = None
@@ -308,7 +312,7 @@ class BulletProof:
         
     def Print(self):
         print()
-        print("Bulletproof:")
+        print("Simple Bulletproof:")
         print("V:    " + print_point(CompressPoint(self.V)))
         print("A:    " + print_point(CompressPoint(self.A)))
         print("S:    " + print_point(CompressPoint(self.S)))
@@ -317,11 +321,9 @@ class BulletProof:
         print("taux: " + hex(self.taux))
         print("mu:   " + hex(self.mu))
 
-        print()
         for i in range(0, len(self.L)):
             print("L[" + str(i) + "]: " + print_point(CompressPoint(self.L[i])))
 
-        print()
         for i in range(0, len(self.R)):
             print("R[" + str(i) + "]: " + print_point(CompressPoint(self.R[i])))
 
@@ -332,7 +334,7 @@ class BulletProof:
         print()
 
     def Print_Serialized(self):
-        print("Bullet Proof:")
+        print("Simple Bullet Proof:")
         print("[" + hex(self.V[0].n) + ",")
         print(hex(self.V[1].n) + ",")
         print(hex(self.A[0].n) + ",")
@@ -366,15 +368,15 @@ class BulletProof:
         print(point_to_str(self.V))
 
 
-def BulletProofTest():
+def SimpleBulletProofTest():
     print()
-    print("Creating Bulletproof")
-    bp = BulletProof.Prove(13, 4)
+    print("Creating Simple Bulletproof")
+    bp = SimpleBulletProof.Prove(13, N=8)
     bp.Print()
 
-    print("Verifying Bulletproof")
+    print("Verifying Simple Bulletproof")
     print(bp.Verify())
-    bp.Print_Serialized()
+    #bp.Print_Serialized()
     return bp
 
-bp = BulletProofTest()
+bp = SimpleBulletProofTest()

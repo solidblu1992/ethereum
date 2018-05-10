@@ -451,7 +451,8 @@ class MultiBulletProof:
         print(point_to_str(self.V))
 
 
-def MultiBulletProofTest():
+def MultiBulletProofTest1():
+    #Test verifying two bullet proofs with same number of commtiments and values of N
     print()
     print("Creating Multi Bulletproof 1")
     bp1 = MultiBulletProof.Prove([13, 4], N=8)
@@ -474,4 +475,76 @@ def MultiBulletProofTest():
     print(MultiBulletProof.VerifyMulti(bp))
     return bp
 
-bp = MultiBulletProofTest()
+def MultiBulletProofTest2():
+    #Test verifying two bullet proofs at once with different values of N
+    print()
+    print("Creating Multi Bulletproof 1")
+    bp1 = MultiBulletProof.Prove([13, 4], N=8)
+    bp1.Print()
+
+    print("Verifying Multi Bulletproof 1")
+    print(bp1.Verify())
+
+    print()
+    print("Creating Multi Bulletproof 2")
+    bp2 = MultiBulletProof.Prove([27, 1], N=16)
+    bp2.Print()
+
+    print("Verifying Multi Bulletproof 2")
+    print(bp2.Verify())
+
+    print()
+    print("Verifying Both Multi Bulletproofs at Once")
+    bp = [bp1, bp2]
+    print(MultiBulletProof.VerifyMulti(bp))
+    return bp
+
+def MultiBulletProofTest3():
+    #Test verifying two bullet proofs with different numbers of commitments
+    print()
+    print("Creating Multi Bulletproof 1")
+    bp1 = MultiBulletProof.Prove([13, 4, 8, 12], N=8)
+    bp1.Print()
+
+    print("Verifying Multi Bulletproof 1")
+    print(bp1.Verify())
+
+    print()
+    print("Creating Multi Bulletproof 2")
+    bp2 = MultiBulletProof.Prove([27, 1], N=8)
+    bp2.Print()
+
+    print("Verifying Multi Bulletproof 2")
+    print(bp2.Verify())
+
+    print()
+    print("Verifying Both Multi Bulletproofs at Once")
+    bp = [bp1, bp2]
+    print(MultiBulletProof.VerifyMulti(bp))
+    return bp
+
+def MultiBulletProofTest4():
+    #Test verifying two bullet proofs with different numbers of commitments and different values of N
+    print()
+    print("Creating Multi Bulletproof 1")
+    bp1 = MultiBulletProof.Prove([13, 4, 8, 12], N=8)
+    bp1.Print()
+
+    print("Verifying Multi Bulletproof 1")
+    print(bp1.Verify())
+
+    print()
+    print("Creating Multi Bulletproof 2")
+    bp2 = MultiBulletProof.Prove([27, 1], N=16)
+    bp2.Print()
+
+    print("Verifying Multi Bulletproof 2")
+    print(bp2.Verify())
+
+    print()
+    print("Verifying Both Multi Bulletproofs at Once")
+    bp = [bp1, bp2]
+    print(MultiBulletProof.VerifyMulti(bp))
+    return bp
+
+bp = MultiBulletProofTest4()

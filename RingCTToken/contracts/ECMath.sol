@@ -271,24 +271,27 @@ contract ECMath is Debuggable {
     {
         require(P.length > 1);
         require(P.length % 2 == 0);
-        require(P.length == s.length);
+        require(P.length == 2*s.length);
         if (end == 0) end = s.length;
+        require(end > start);
         
-        uint256 i;
+        //Multiply first point
         uint256 index = 2*start;
-        
         Pout = Multiply([P[index], P[index+1]], s[start]);
+        index += 2;
+        
+        //Multiply the rest of the points
+        uint256 i;
         for (i = start+1; i < end; i++) {
             Pout = AddMultiply(Pout, [P[index], P[index+1]], s[i]);
             index += 2;
         }
     }
-	
-	//Returns Pin + s0*P0 + s1*P1 + ... + sk*Pk
-	function AddMultiExp(uint256[] Pin, uint256[] P, uint256[] s, uint256 start, uint256 end)
+    
+    //Returns Pin + s0*P0 + s1*P1 + ... + sk*Pk
+	function AddMultiExp(uint256[2] Pin, uint256[] P, uint256[] s, uint256 start, uint256 end)
         public constant returns (uint256[2] Pout)
     {
-		require(Pin.length == 2);
 		Pout = Add(Pin, MultiExp(P, s, start, end));
 	}
     

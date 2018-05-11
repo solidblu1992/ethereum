@@ -37,7 +37,7 @@ contract ECMath {
     function MultiExp(uint256[] P, uint256[] s, uint256 start, uint256 end) public constant returns (uint256[2] Pout);
 	
 	//Returns Pin + s0*P0 + s1*P1 + ... + sk*Pk
-	function AddMultiExp(uint256[] Pin, uint256[] P, uint256[] s, uint256 start, uint256 end) public constant returns (uint256[2] Pout);
+	function AddMultiExp(uint256[2] Pin, uint256[] P, uint256[] s, uint256 start, uint256 end) public constant returns (uint256[2] Pout);
 	
 	//Returns px = x[0]*X[0] + x[1]*X[1] + ... + x[n-1]*X[n-1]
     //    and py = y[0]*Y[0] + y[1]*Y[1] + ... + y[n-1]*Y[n-1]

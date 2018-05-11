@@ -318,15 +318,16 @@ class MultiBulletProof:
                 hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
             #Debug Printing
-            #print()
-            #print("Bullet Proof Fiat-Shamir Challenges:")
-            #print("y:    " + hex(y))
-            #print("z:    " + hex(z))
-            #print("x:    " + hex(x))
-            #print("x_ip: " + hex(x_ip))
-            #for i in range(0, len(w)):
-            #    print("w[" + str(i) + "]: " + hex(w[i]))
-            #print("k:    " + hex(k))
+            if (True):
+                print()
+                print("Bullet Proof Fiat-Shamir Challenges:")
+                print("y:    " + hex(y))
+                print("z:    " + hex(z))
+                print("x:    " + hex(x))
+                print("x_ip: " + hex(x_ip))
+                for i in range(0, len(w)):
+                    print("w[" + str(i) + "]: " + hex(w[i]))
+                print("k:    " + hex(k))
 
             #Compute base point scalars
             for i in range(0, M*proof.N):
@@ -346,8 +347,8 @@ class MultiBulletProof:
                 hScalar = sSub(hScalar, sMul(sAdd(sMul(z, vpy[i]), sMul(sPow(z, 2+(i//proof.N)), vp2[i%proof.N])), vpyi[i]))
 
                 #Update z4 and z5 checks for Stage 2
-                z4[i] = sAdd(z4[i], sMul(gScalar, weight))
-                z5[i] = sAdd(z5[i], sMul(hScalar, weight))
+                z4[i] = sSub(z4[i], sMul(gScalar, weight))
+                z5[i] = sSub(z5[i], sMul(hScalar, weight))
 
             #Apply weight to remaining checks (everything but z4 and z5)
             #Stage 1 Checks
@@ -384,24 +385,25 @@ class MultiBulletProof:
         Check2 = add(Z0, multiply(G1, sNeg(z1)))
         Check2 = add(Check2, multiply(H, z3))
         for i in range(0, maxMN):
-            Check2 = add(Check2, multiply(Gi[i], sNeg(z4[i])))
-            Check2 = add(Check2, multiply(Hi[i], sNeg(z5[i])))
+            Check2 = add(Check2, multiply(Gi[i], z4[i]))
+            Check2 = add(Check2, multiply(Hi[i], z5[i]))
 
         #More Debug Printing
-        #print("y0: " + hex(y0))
-        #print("y1: " + hex(y1))
-        #print("Y2: " + hex(CompressPoint(Y2)))
-        #print("Y3: " + hex(CompressPoint(Y3)))
-        #print("Y4: " + hex(CompressPoint(Y4)))
-        #print()
-        #print("Z0: " + hex(CompressPoint(Z0)))
-        #print("z1: " + hex(z1))
-        #print("Z2: " + hex(CompressPoint(Z2)))
-        #print("z3: " + hex(z3))
-        #for i in range(0, len(z4)):
-        #    print("z4[" + str(i) + "]: " + hex(z4[i]))
-        #for i in range(0, len(z5)):
-        #    print("z5[" + str(i) + "]: " + hex(z5[i]))            
+        if (True):
+            print("y0: " + hex(y0))
+            print("y1: " + hex(y1))
+            print("Y2: " + hex(CompressPoint(Y2)))
+            print("Y3: " + hex(CompressPoint(Y3)))
+            print("Y4: " + hex(CompressPoint(Y4)))
+            print()
+            print("Z0: " + hex(CompressPoint(Z0)))
+            print("z1: " + hex(z1))
+            print("Z2: " + hex(CompressPoint(Z2)))
+            print("z3: " + hex(z3))
+            for i in range(0, len(z4)):
+                print("z4[" + str(i) + "]: " + hex(z4[i]))
+            for i in range(0, len(z5)):
+                print("z5[" + str(i) + "]: " + hex(z5[i]))            
 
         if (Check2 != neg(Z2)):
             print("Stage 2 Check Failed!")
@@ -605,4 +607,4 @@ def MultiBulletProofTest4():
     print(MultiBulletProof.VerifyMulti(bp))
     return bp
 
-bp = MultiBulletProof.Prove([13, 4], N=16)
+bp = MultiBulletProof.Prove([13], N=16)

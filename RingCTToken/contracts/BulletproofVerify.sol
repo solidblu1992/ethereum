@@ -5,7 +5,7 @@ import "./ECMathInterface.sol";
 import "./libBulletproofStruct.sol";
 
 contract BulletproofVerify is ECMathInterface {
-	uint256 private NCurve;
+	uint256 private NCurve; //Stored locally in order to minimize ECMath calls
 
 	//Contstructor Function - Initializes Prerequisite Contract(s)
 	constructor(address _ecMathAddr) ECMathInterface(_ecMathAddr) public {
@@ -179,7 +179,7 @@ contract BulletproofVerify is ECMathInterface {
 		        
 		        v.vpz = vPow(v.z, v.M);
 		        v.vpz = vScale(v.vpz, sSq(v.z));
-		        v.Y2 = ecMath.MultiExp(bp[p].V, v.vpz, 0, 0);
+		        v.Y2 = ecMath.MultiExp(bp[0].V, v.vpz, 0, 0);
 		        
 		        v.Y3 = ecMath.Multiply(bp[0].T1, v.x);
 		        v.Y4 = ecMath.Multiply(bp[0].T2, sSq(v.x));
@@ -189,8 +189,8 @@ contract BulletproofVerify is ECMathInterface {
 		        
 		        v.w = vMul(v.w, v.w);
 		        v.wi = vMul(v.wi, v.wi);
-		        v.Z2 = ecMath.MultiExp(bp[p].L, v.w, 0, 0);
-		        v.Z2 = ecMath.AddMultiExp(v.Z2, bp[p].R, v.wi, 0, 0);
+		        v.Z2 = ecMath.MultiExp(bp[0].L, v.w, 0, 0);
+		        v.Z2 = ecMath.AddMultiExp(v.Z2, bp[0].R, v.wi, 0, 0);
 		        
 		        v.z3 = sMul(sSub(bp[0].t, sMul(bp[0].a, bp[0].b)), v.x_ip);
 		    }
@@ -258,17 +258,6 @@ contract BulletproofVerify is ECMathInterface {
 	
 	function VerifyBulletproof(uint256[] argsSerialized) public view returns (bool) {
 		return VerifyBulletproof(BulletproofStruct.Deserialize(argsSerialized));
-	}
-	
-	function VerifyBulletproof_tx(uint256[] argsSerialized) public returns (bool) {
-	    if (VerifyBulletproof(BulletproofStruct.Deserialize(argsSerialized))) {
-	        emit DebugEvent("success!", 0);
-	        return true;
-	    }
-	    else {
-	        emit DebugEvent("failure!", 1);
-	        return false;
-	    }
 	}
 	
 	//Low level helper functions

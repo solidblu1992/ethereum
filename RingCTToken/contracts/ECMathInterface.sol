@@ -33,6 +33,12 @@ contract ECMath {
 	function VectorAdd(uint256[] X, uint256[] Y) public constant returns (uint256[] Z);
 	function VectorMul(uint256[] X, uint256[] s) public constant returns (uint256[] Z);
 	
+	//Returns s0*P0 + s1*P1 + ... + sk*Pk
+    function MultiExp(uint256[] P, uint256[] s, uint256 start, uint256 end) public constant returns (uint256[2] Pout);
+	
+	//Returns Pin + s0*P0 + s1*P1 + ... + sk*Pk
+	function AddMultiExp(uint256[] Pin, uint256[] P, uint256[] s, uint256 start, uint256 end) public constant returns (uint256[2] Pout);
+	
 	//Returns px = x[0]*X[0] + x[1]*X[1] + ... + x[n-1]*X[n-1]
     //    and py = y[0]*Y[0] + y[1]*Y[1] + ... + y[n-1]*Y[n-1]
     function CommitAB(uint256[] X, uint256[] Y, uint256[] x, uint256[] y) public constant returns (uint256[2] px, uint256[2] py);

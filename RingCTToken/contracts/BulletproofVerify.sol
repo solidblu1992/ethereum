@@ -31,6 +31,7 @@ contract BulletproofVerify is ECMathInterface {
 		uint256[] vp2;
 		uint256[] vpy;
 		uint256[] vpyi;
+		uint256[] vpz;
 		uint256[] w;
 		uint256[] wi;
 		uint256[] Gi;
@@ -161,12 +162,12 @@ contract BulletproofVerify is ECMathInterface {
 		    
 		        //If only one proof, weights are not needed
 		        if (bp.length == 1) {
-		            v.z4[i] = sAdd(v.z4[i], v.gs);
-		            v.z5[i] = sAdd(v.z5[i], v.hs);
+		            v.z4[i] = sNeg(v.gs);
+		            v.z5[i] = sNeg(v.hs);
 		        }
 		        else {
-    		        v.z4[i] = sAdd(v.z4[i], sMul(v.gs, v.weight));
-    		        v.z5[i] = sAdd(v.z5[i], sMul(v.hs, v.weight));
+    		        v.z4[i] = sSub(v.z4[i], sMul(v.gs, v.weight));
+    		        v.z5[i] = sSub(v.z5[i], sMul(v.hs, v.weight));
 		        }
 		    }
 		    
@@ -176,12 +177,9 @@ contract BulletproofVerify is ECMathInterface {
 		        v.y0 = bp[0].taux;
 		        v.y1 = sSub(bp[0].t, sAdd(v.k, sMul(v.z, vSum(v.vpy))));
 		        
-		        v.Y2 = ecMath.Multiply([bp[0].V[0], bp[0].V[1]], sSq(v.z));
-		        index = 2;
-		        for (j = 1; j < v.M; j++) {
-		            v.Y2 = ecMath.AddMultiply(v.Y2, [bp[0].V[index], bp[0].V[index+1]], sPow(v.z, j+2));
-		            index += 2;
-		        }
+		        v.vpz = vPow(v.z, v.M);
+		        v.vpz = vScale(v.vpz, sSq(v.z));
+		        v.Y2 = ecMath.MultiExp(bp[p].V, v.vpz, 0, 0);
 		        
 		        v.Y3 = ecMath.Multiply(bp[0].T1, v.x);
 		        v.Y4 = ecMath.Multiply(bp[0].T2, sSq(v.x));
@@ -189,27 +187,20 @@ contract BulletproofVerify is ECMathInterface {
 		        v.Z0 = ecMath.AddMultiply(bp[0].A, bp[0].S, v.x);
 		        v.z1 = bp[0].mu;
 		        
-		        v.Z2 = ecMath.Multiply([bp[0].L[0], bp[0].L[1]], sSq(v.w[0]));
-		        v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[0], bp[0].R[1]], sSq(v.wi[0]));
-		        index = 2;
-		        for (i = 1; i < v.logMN; i++) {
-		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].L[index], bp[0].L[index+1]], sSq(v.w[i]));
-		            v.Z2 = ecMath.AddMultiply(v.Z2, [bp[0].R[index], bp[0].R[index+1]], sSq(v.wi[i]));
-		            index += 2;
-		        }
+		        v.w = vMul(v.w, v.w);
+		        v.wi = vMul(v.wi, v.wi);
+		        v.Z2 = ecMath.MultiExp(bp[p].L, v.w, 0, 0);
+		        v.Z2 = ecMath.AddMultiExp(v.Z2, bp[p].R, v.wi, 0, 0);
 		        
 		        v.z3 = sMul(sSub(bp[0].t, sMul(bp[0].a, bp[0].b)), v.x_ip);
 		    }
 		    else {
 		        v.y0 = sAdd(v.y0, sMul(bp[p].taux, v.weight));
                 v.y1 = sAdd(v.y1, sMul(sSub(bp[p].t, sAdd(v.k, sMul(v.z, vSum(v.vpy)))), v.weight));
-		    
-		        v.point = ecMath.Multiply([bp[p].V[0], bp[p].V[1]], sSq(v.z));
-		        index = 2;
-		        for (j = 1; j < v.M; j++) {
-		            v.point = ecMath.AddMultiply(v.point, [bp[p].V[index], bp[p].V[index+1]], sPow(v.z, j+2));
-		            index += 2;
-		        }
+		        
+		        v.vpz = vPow(v.z, v.M);
+		        v.vpz = vScale(v.vpz, sSq(v.z));
+		        v.point = ecMath.MultiExp(bp[p].V, v.vpz, 0, 0);
 		        v.Y2 = ecMath.AddMultiply(v.Y2, v.point, v.weight);
 		        
 		        v.Y3 = ecMath.AddMultiply(v.Y3, ecMath.Multiply(bp[p].T1, v.x), v.weight);
@@ -218,14 +209,10 @@ contract BulletproofVerify is ECMathInterface {
 		        v.Z0 = ecMath.AddMultiply(v.Z0, ecMath.AddMultiply(bp[p].A, bp[p].S, v.x), v.weight);
 		        v.z1 = sAdd(v.z1, sMul(bp[p].mu, v.weight));
 		        
-		        v.point = ecMath.Multiply([bp[p].L[0], bp[p].L[1]], sSq(v.w[0]));
-		        v.point = ecMath.AddMultiply(v.point, [bp[p].R[0], bp[p].R[1]], sSq(v.wi[0]));
-		        index = 2;
-		        for (i = 1; i < v.logMN; i++) {
-		            v.point = ecMath.AddMultiply(v.point, [bp[p].L[index], bp[p].L[index+1]], sSq(v.w[i]));
-		            v.point = ecMath.AddMultiply(v.point, [bp[p].R[index], bp[p].R[index+1]], sSq(v.wi[i]));
-					index += 2;
-		        }
+		        v.w = vMul(v.w, v.w);
+		        v.wi = vMul(v.wi, v.wi);
+		        v.point = ecMath.MultiExp(bp[p].L, v.w, 0, 0);
+		        v.point = ecMath.AddMultiExp(v.point, bp[p].R, v.wi, 0, 0);
 		        v.Z2 = ecMath.AddMultiply(v.Z2, v.point, v.weight);
 		        
 		        v.z3 = sAdd(v.z3, sMul(sMul(sSub(bp[p].t, sMul(bp[p].a, bp[p].b)), v.x_ip), v.weight));
@@ -251,13 +238,8 @@ contract BulletproofVerify is ECMathInterface {
 		//Stage 2 Checks
 		v.point = ecMath.AddMultiplyG1(v.Z0, sNeg(v.z1));
 		v.point = ecMath.AddMultiplyH(v.point, v.z3);
-		
-		index = 0;
-		for (i = 0; i < v.maxMN; i++) {
-		    v.point = ecMath.AddMultiply(v.point, [v.Gi[index], v.Gi[index+1]], sNeg(v.z4[i]));
-		    v.point = ecMath.AddMultiply(v.point, [v.Hi[index], v.Hi[index+1]], sNeg(v.z5[i]));
-		    index +=2;
-		}
+		v.point = ecMath.AddMultiExp(v.point, v.Gi, v.z4, 0, 0);
+		v.point = ecMath.AddMultiExp(v.point, v.Hi, v.z5, 0, 0);
 		
 		if (!ecMath.Equals(v.point, ecMath.Negate(v.Z2))) {
 		    /*emit DebugEvent("check2 failed!", 1);
@@ -362,83 +344,24 @@ contract BulletproofVerify is ECMathInterface {
 		}
 	}
 	
-	function vAdd(uint256[] a, uint256[] b) internal view returns (uint256[] out) {
-		require(a.length > 0);
-		require(a.length == b.length);
-		
-		out = new uint256[](a.length);
-
-		for (uint256 i = 0; i < a.length; i++) {
-			out[i] = sAdd(a[i], b[i]);
-		}
-	}
-	
-	function vSub(uint256[] a, uint256[] b) internal view returns (uint256[] out) {
-		require(a.length > 0);
-		require(a.length == b.length);
-		
-		out = new uint256[](a.length);
-
-		for (uint256 i = 0; i < a.length; i++) {
-			out[i] = sSub(a[i], b[i]);
-		}
-	}
-	
 	function vMul(uint256[] a, uint256[] b) internal view returns (uint256[] out) {
-		require(a.length > 0);
-		require(a.length == b.length);
-		
-		out = new uint256[](a.length);
-
-		for (uint256 i = 0; i < a.length; i++) {
-			out[i] = sMul(a[i], b[i]);
-		}
-	}
-	
-	function vScale(uint256[] a, uint256 s) internal view returns (uint256[] out) {
+ 		require(a.length > 0);
+ 		require(a.length == b.length);
+ 		
+ 		out = new uint256[](a.length);
+ 
+ 		for (uint256 i = 0; i < a.length; i++) {
+ 			out[i] = sMul(a[i], b[i]);
+ 		}
+ 	}
+ 	
+ 	function vScale(uint256[] a, uint256 s) internal view returns (uint256[] out) {
 		require(a.length > 0);
 		
 		out = new uint256[](a.length);
 
 		for (uint256 i = 0; i < a.length; i++) {
 			out[i] = sMul(a[i], s);
-		}
-	}
-	
-	function vDot(uint256[] a, uint256[] b) internal view returns (uint256 out) {
-		require(a.length > 0);
-		require(a.length == b.length);
-
-		out = sMul(a[0], b[0]);
-		for (uint256 i = 1; i < a.length; i++) {
-			out = sAdd(out, sMul(a[i], b[i]));
-		}
-	}
-	
-	function vSlice(uint256[] a, uint256 start, uint256 end) internal pure returns (uint256[] out) {
-		require(a.length > 0);
-		require(end > start);
-		require(end <= a.length);
-		
-		out = new uint256[](end-start);
-		
-		for (uint256 i = start; i < end; i++) {
-			out[i-start] = a[i];
-		}
-	}
-	
-	function pvSlice(uint256[] A, uint256 start, uint256 end) internal pure returns (uint256[] out) {
-	    require(A.length > 1);
-	    require(A.length % 2 == 0);
-	    require(end > start);
-		
-		start = 2*start;
-		end = 2*end;
-		require(end <= A.length);
-	
-		out = new uint256[](end-start);
-		for (uint256 i = start; i < end; i++) {
-		    out[i-start] = A[i];
 		}
 	}
 	

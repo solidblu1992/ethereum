@@ -264,28 +264,41 @@ contract ECMath is Debuggable {
 			(Z[index], Z[index+1]) = (temp[0], temp[1]);
 		}
 	}
+	
+	//Returns s0*P0 + s1*P1 + ... + sk*Pk
+    function MultiExp(uint256[] P, uint256[] s, uint256 start, uint256 end)
+        public constant returns (uint256[2] Pout)
+    {
+        require(P.length > 1);
+        require(P.length % 2 == 0);
+        require(P.length == s.length);
+        if (end == 0) end = s.length;
+        
+        uint256 i;
+        uint256 index = 2*start;
+        
+        Pout = Multiply([P[index], P[index+1]], s[start]);
+        for (i = start+1; i < end; i++) {
+            Pout = AddMultiply(Pout, [P[index], P[index+1]], s[i]);
+            index += 2;
+        }
+    }
+	
+	//Returns Pin + s0*P0 + s1*P1 + ... + sk*Pk
+	function AddMultiExp(uint256[] Pin, uint256[] P, uint256[] s, uint256 start, uint256 end)
+        public constant returns (uint256[2] Pout)
+    {
+		require(Pin.length == 2);
+		Pout = Add(Pin, MultiExp(P, s, start, end));
+	}
     
     //Returns px = x[0]*X[0] + x[1]*X[1] + ... + x[n-1]*X[n-1]
     //    and py = y[0]*Y[0] + y[1]*Y[1] + ... + y[n-1]*Y[n-1]
     function CommitAB(uint256[] X, uint256[] Y, uint256[] x, uint256[] y)
         public constant returns (uint256[2] px, uint256[2] py)
     {
-        require(x.length > 0);
-        require(y.length == x.length);
-        
-		require(X.length % 2 == 0);
-        require(X.length >= x.length*2);
-        require(Y.length == X.length);
-        
-        uint256 i;
-        uint256 index;
-        px = Multiply([X[0], X[1]], x[0]);
-        py = Multiply([Y[0], Y[1]], y[0]);
-        for (i = 1; i < x.length; i++) {
-            index = 2*i;
-            px = AddMultiply(px, [X[index], X[index+1]], x[i]);
-            py = AddMultiply(py, [Y[index], Y[index+1]], y[i]);
-        }
+        px = MultiExp(X, x, 0, 0);
+        py = MultiExp(Y, y, 0, 0);
     }
     
     //Point Compression and Expansion Functions

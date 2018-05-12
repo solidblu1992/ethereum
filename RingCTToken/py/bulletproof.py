@@ -1,6 +1,6 @@
 from bulletproofutil import *
 
-class MultiBulletProof:
+class BulletProof:
     V = [None]
     A = None
     S = None
@@ -31,7 +31,8 @@ class MultiBulletProof:
             self.N = N
     
     def Prove(v, gamma=None, N=32):
-        assert(type(v) == list)
+        if (type(v) != list):
+            v = [v]
 
         if (gamma == None):
             gamma = getRandom(len(v))
@@ -227,12 +228,12 @@ class MultiBulletProof:
         #for i in range(0, len(w)):
         #    print("w[" + str(i) + "]: " + hex(w[i]))
         
-        return MultiBulletProof(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
+        return BulletProof(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
 
     #Verify batch of proofs
     def VerifyMulti(proofs):
         assert (type(proofs) == list)
-        assert (type(proofs[0]) == MultiBulletProof)
+        assert (type(proofs[0]) == BulletProof)
 
         #Find longest proof
         maxLength = 0
@@ -318,7 +319,7 @@ class MultiBulletProof:
                 hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
             #Debug Printing
-            if (True):
+            if (False):
                 print()
                 print("Bullet Proof Fiat-Shamir Challenges:")
                 print("y:    " + hex(y))
@@ -389,7 +390,7 @@ class MultiBulletProof:
             Check2 = add(Check2, multiply(Hi[i], z5[i]))
 
         #More Debug Printing
-        if (True):
+        if (False):
             print("y0: " + hex(y0))
             print("y1: " + hex(y1))
             print("Y2: " + hex(CompressPoint(Y2)))
@@ -413,11 +414,11 @@ class MultiBulletProof:
         
     #On verify self, this is the only proof
     def Verify(self):
-        return MultiBulletProof.VerifyMulti([self])
+        return BulletProof.VerifyMulti([self])
 
     def Print(self):
         print()
-        print("Multi Bulletproof:")
+        print("Bulletproof:")
         
         for i in range(0, len(self.V)):
             print("V[" + str(i) + "]: " + print_point(CompressPoint(self.V[i])))
@@ -441,9 +442,10 @@ class MultiBulletProof:
         print("N:    " + str(self.N))
         print()
 
-    def Print_Serialized(self):
-        print("Multi Bullet Proof:")
-        print("[" + str(1) + "," + str(len(self.V*2)) + ",")
+    def Print_MEW(self):
+        print("Bullet Proof:")
+        print("argsSerialized:")
+        print(str(1) + "," + str(len(self.V*2)) + ",")
         print(str(len(self.L*2)) + "," + str(len(self.R*2)) + ",")
         for i in range(0, len(self.V)):
             print(hex(self.V[i][0].n) + ",")
@@ -470,20 +472,24 @@ class MultiBulletProof:
         print(hex(self.a) + ",")
         print(hex(self.b) + ",")
         print(hex(self.t) + ",")
-        print(str(self.N) + "]")
+        print(str(self.N))
 
-    def Print_Multi_Serialized(proofs):
+    def PrintMultiMEW(proofs):
+        if (type(proofs) == BulletProof):
+            proofs = [proofs]
+            
         print("Multi Bullet Proof:")
-        print("[" + str(len(proofs)) + ",")
+        print("argsSerialized:")
+        print(str(len(proofs)) + ",")
         for i in range(0, len(proofs)):
             if (i > 0):
                 print(",")
                 
             print(str(len(proofs[i].V*2)) + ",")
             print(str(len(proofs[i].L*2)) + "," + str(len(proofs[i].R*2)) + ",")
-            for i in range(0, len(proofs[i].V)):
-                print(hex(proofs[i].V[i][0].n) + ",")
-                print(hex(proofs[i].V[i][1].n) + ",")
+            for j in range(0, len(proofs[i].V)):
+                print(hex(proofs[i].V[j][0].n) + ",")
+                print(hex(proofs[i].V[j][1].n) + ",")
             print(hex(proofs[i].A[0].n) + ",")
             print(hex(proofs[i].A[1].n) + ",")
             print(hex(proofs[i].S[0].n) + ",")
@@ -508,103 +514,100 @@ class MultiBulletProof:
             print(hex(proofs[i].t) + ",")
             print(str(proofs[i].N), end="")
 
-        print ("]")
-
-
-def MultiBulletProofTest1():
+def BulletProofTest1():
     #Test verifying two bullet proofs with same number of commtiments and values of N
     print()
-    print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13], N=8)
+    print("Creating Bulletproof 1")
+    bp1 = BulletProof.Prove(13, N=8)
     bp1.Print()
 
-    print("Verifying Multi Bulletproof 1")
+    print("Verifying Bulletproof 1")
     print(bp1.Verify())
 
     print()
-    print("Creating Multi Bulletproof 2")
-    bp2 = MultiBulletProof.Prove([27], N=8)
+    print("Creating Bulletproof 2")
+    bp2 = BulletProof.Prove(27, N=8)
     bp2.Print()
 
-    print("Verifying Multi Bulletproof 2")
+    print("Verifying Bulletproof 2")
     print(bp2.Verify())
 
     print()
-    print("Verifying Both Multi Bulletproofs at Once")
+    print("Verifying Both Bulletproofs at Once")
     bp = [bp1, bp2]
-    print(MultiBulletProof.VerifyMulti(bp))
+    print(BulletProof.VerifyMulti(bp))
     return bp
 
-def MultiBulletProofTest2():
+def BulletProofTest2():
     #Test verifying two bullet proofs at once with different values of N
     print()
-    print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13, 4], N=8)
+    print("Creating Bulletproof 1")
+    bp1 = BulletProof.Prove([13, 4], N=8)
     bp1.Print()
 
-    print("Verifying Multi Bulletproof 1")
+    print("Verifying Bulletproof 1")
     print(bp1.Verify())
 
     print()
-    print("Creating Multi Bulletproof 2")
-    bp2 = MultiBulletProof.Prove([27, 1], N=16)
+    print("Creating Bulletproof 2")
+    bp2 = BulletProof.Prove([27, 1], N=16)
     bp2.Print()
 
-    print("Verifying Multi Bulletproof 2")
+    print("Verifying Bulletproof 2")
     print(bp2.Verify())
 
     print()
-    print("Verifying Both Multi Bulletproofs at Once")
+    print("Verifying Both Bulletproofs at Once")
     bp = [bp1, bp2]
-    print(MultiBulletProof.VerifyMulti(bp))
+    print(BulletProof.VerifyMulti(bp))
     return bp
 
-def MultiBulletProofTest3():
+def BulletProofTest3():
     #Test verifying two bullet proofs with different numbers of commitments
     print()
-    print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13, 4, 8, 12], N=8)
+    print("Creating Bulletproof 1")
+    bp1 = BulletProof.Prove([13, 4, 8, 12], N=8)
     bp1.Print()
 
-    print("Verifying Multi Bulletproof 1")
+    print("Verifying Bulletproof 1")
     print(bp1.Verify())
 
     print()
-    print("Creating Multi Bulletproof 2")
-    bp2 = MultiBulletProof.Prove([27, 1], N=8)
+    print("Creating Bulletproof 2")
+    bp2 = BulletProof.Prove([27, 1], N=8)
     bp2.Print()
 
-    print("Verifying Multi Bulletproof 2")
+    print("Verifying Bulletproof 2")
     print(bp2.Verify())
 
     print()
-    print("Verifying Both Multi Bulletproofs at Once")
+    print("Verifying Both Bulletproofs at Once")
     bp = [bp1, bp2]
-    print(MultiBulletProof.VerifyMulti(bp))
+    print(BulletProof.VerifyMulti(bp))
     return bp
 
-def MultiBulletProofTest4():
+def BulletProofTest4():
     #Test verifying two bullet proofs with different numbers of commitments and different values of N
     print()
-    print("Creating Multi Bulletproof 1")
-    bp1 = MultiBulletProof.Prove([13, 4, 8, 12], N=8)
+    print("Creating Bulletproof 1")
+    bp1 = BulletProof.Prove([13, 4, 8, 12], N=8)
     bp1.Print()
 
-    print("Verifying Multi Bulletproof 1")
+    print("Verifying Bulletproof 1")
     print(bp1.Verify())
 
     print()
-    print("Creating Multi Bulletproof 2")
-    bp2 = MultiBulletProof.Prove([27, 1], N=16)
+    print("Creating Bulletproof 2")
+    bp2 = BulletProof.Prove([27, 1], N=16)
     bp2.Print()
 
-    print("Verifying Multi Bulletproof 2")
+    print("Verifying Bulletproof 2")
     print(bp2.Verify())
 
     print()
-    print("Verifying Both Multi Bulletproofs at Once")
+    print("Verifying Both Bulletproofs at Once")
     bp = [bp1, bp2]
-    print(MultiBulletProof.VerifyMulti(bp))
+    print(BulletProof.VerifyMulti(bp))
     return bp
 
-bp = MultiBulletProof.Prove([13], N=16)
+bp = BulletProofTest4()

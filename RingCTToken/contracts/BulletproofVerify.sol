@@ -18,39 +18,52 @@ contract BulletproofVerify is ECMathInterface {
     
 	//Verify single bullet proof
 	struct Variables {
+	    //Fiat-Shamir Challenges
 		uint256 x;
 		uint256 y;
 		uint256 z;
 		uint256 k;
 		uint256 x_ip;
+		
+		//M = # of commitments
+		//N = # of bits
 		uint256 logMN;
 		uint256 maxMN;
 		uint256 M;
-		uint256 gs;
-		uint256 hs;
-		uint256[] vp2;
-		uint256[] vpy;
-		uint256[] vpyi;
-		uint256[] vpz;
-		uint256[] w;
-		uint256[] wi;
-		uint256[] Gi;
-		uint256[] Hi;
-		uint256 weight;
-		uint256 y0;
-		uint256 y1;
-		uint256[2] Y2;
-		uint256[2] Y3;
-		uint256[2] Y4;
-		uint256[2] Z0;
-		uint256 z1;
-		uint256[2] Z2;
-		uint256 z3;
-		uint256[] z4;
-		uint256[] z5;
-		uint256[2] point;
+		
+		uint256 gs;         //Scalar for Gi generator points
+		uint256 hs;         //Scalar for Hi generator points
+		uint256[] vp2;      //[2^0, 2^1, ..., 2^(N-1)]
+		uint256[] vpy;      //[y^0, y^1, ..., y^(M*N-1)]
+		uint256[] vpyi;     //[y^0, y^(-1), ..., y^(1-M*N)]
+		uint256[] vpz;      //[z^0, z^1, ..., z^(M-1)]
+		
+		uint256[] w;        //More Fiat-Shamir Challenges
+		uint256[] wi;       //w[]^(-1)
+		uint256[] Gi;       //Generator points: [H2P(H), H2P(Hi[0]), H2P(Hi[1]), ...] 
+		uint256[] Hi;       //Generator points: [H2P(Gi[0]), H2P(Gi[1]), H2P(Gi[2])...]
+		
+		uint256 weight;     //Weight for each batched proof
+		
+		//Batched proof checks
+		//Stage 1 Checks
+		uint256 y0;         //taux
+		uint256 y1;         //t-(k+z+vSum(vpy))
+		uint256[2] Y2;      //z-vSum(V)
+		uint256[2] Y3;      //xT1
+		uint256[2] Y4;      //(x^2)*T2
+		
+		//Stage 2 Checks
+		uint256[2] Z0;      //A + xS
+		uint256 z1;         //mu
+		uint256[2] Z2;      //Li and Ri sum
+		uint256 z3;         //(t-a*b)*x_ip
+		uint256[] z4;       //sum(gs)
+		uint256[] z5;       //sum(hs)
+		uint256[2] point;   //Temporary point
 	}
 	
+	//Verify Bulletproof(s), can do multiple commitements and multiple proofs at once
 	function VerifyBulletproof(BulletproofStruct.Data[] bp)
 	    internal constant requireECMath returns (bool) {
 	    //Find longest proof
@@ -256,6 +269,7 @@ contract BulletproofVerify is ECMathInterface {
 		}
 	}
 	
+	//Serialized version of VerifyBulletproof() for external calling
 	function VerifyBulletproof(uint256[] argsSerialized) public view returns (bool) {
 		return VerifyBulletproof(BulletproofStruct.Deserialize(argsSerialized));
 	}

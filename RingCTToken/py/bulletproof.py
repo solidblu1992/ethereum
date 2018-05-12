@@ -610,4 +610,4 @@ def BulletProofTest4():
     print(BulletProof.VerifyMulti(bp))
     return bp
 
-bp = BulletProofTest4()
+#bp = BulletProofTest4()

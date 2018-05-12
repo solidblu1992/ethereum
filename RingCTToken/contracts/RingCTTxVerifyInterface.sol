@@ -1,15 +1,15 @@
 pragma solidity ^0.4.22;
 
 import "./Debuggable.sol";
-import "./libVerifyPCRangeProofStruct.sol";
-import "./libValidateRingCTTxStruct.sol";
+import "./libBorromeanRangeProofStruct.sol";
+import "./libRingCTTxStruct.sol";
 
 contract RingCTTxVerify {    
     //Serialized version of ValidateRingCTTx.  This version does not use structs so that it can be called publicly.
 	function ValidateRingCTTx(uint256[] argsSerialized) public view returns (bool);
     
-    //Serialized version of VerifyPCRangeProof.  This version does not use structs so that it can be called publicly.
-	function VerifyPCRangeProof(uint256[] argsSerialized) public view returns (bool);
+    //Serialized version of VerifyBorromeanRangeProof.  This version does not use structs so that it can be called publicly.
+	function VerifyBorromeanRangeProof(uint256[] argsSerialized) public view returns (bool);
 	
     //Utility Functions
 	function HashSendMsg(uint256[] output_pub_keys, uint256[] output_values, uint256[] output_dhe_points, uint256[] output_encrypted_data)

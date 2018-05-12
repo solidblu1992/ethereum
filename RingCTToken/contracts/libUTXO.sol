@@ -170,11 +170,11 @@ library UTXO {
 	    }
 	}
 	
-	function EchoTestInput(uint256[] argsSerialized) public constant returns (uint256[]) {
+	function EchoTestInput(uint256[] argsSerialized) public pure returns (uint256[]) {
 	    return SerializeInputArray(DeserializeInputArray(argsSerialized));
 	}
 	
-	function EchoTestOutput(uint256[] argsSerialized) public constant returns (uint256[]) {
+	function EchoTestOutput(uint256[] argsSerialized) public pure returns (uint256[]) {
 	    return SerializeOutputArray(DeserializeOutputArray(argsSerialized));
 	}
 }

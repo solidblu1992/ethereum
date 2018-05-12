@@ -3,10 +3,15 @@ pragma solidity ^0.4.22;
 import "./Debuggable.sol";
 import "./ECMathInterface.sol";
 import "./RingCTTxVerifyInterface.sol";
+import "./BulletproofVerifyInterface.sol";
 
-contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
+contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVerifyInterface {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
-	constructor(address ringCTVerifyAddr, address ecMathAddr) RingCTTxVerifyInterface(ringCTVerifyAddr) ECMathInterface(ecMathAddr) public { }
+	constructor(address ringCTVerifyAddr, address ecMathAddr, address bpVerifyAddr)
+		RingCTTxVerifyInterface(ringCTVerifyAddr) ECMathInterface(ecMathAddr) BulletproofVerifyInterface(bpVerifyAddr) public
+	{
+		//Nothing left to do
+	}
 	
 	event WithdrawalEvent(address indexed _to, uint256 _value);
 	event DepositEvent (uint256 indexed _pub_key, uint256 indexed _dhe_point, uint256 _value);
@@ -180,12 +185,12 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
     //          C1',   C2',   ..., Cm',
     //          C1'',  C2'',  ..., Cm'',
     //          C1''', C2''', ..., Cm''' }
-    function VerifyPCRangeProof(uint256[2] total_commit, uint256 power10, uint256 offset, uint256[] bit_commits, uint256[] signature)
+    function VerifyBorromeanRangeProof(uint256[2] total_commit, uint256 power10, uint256 offset, uint256[] bit_commits, uint256[] signature)
         public requireRingCTTxVerify returns (bool success)
     {
-        VerifyPCRangeProofStruct.Data memory args = VerifyPCRangeProofStruct.Data(total_commit, power10, offset, bit_commits, signature);
+        BorromeanRangeProofStruct.Data memory args = BorromeanRangeProofStruct.Data(total_commit, power10, offset, bit_commits, signature);
 		
-		success = ringcttxverify.VerifyPCRangeProof(VerifyPCRangeProofStruct.Serialize(args));
+		success = ringcttxverify.VerifyBorromeanRangeProof(BorromeanRangeProofStruct.Serialize(args));
 		
 		if (success) {
 			balance_positive[ecMath.CompressPoint(total_commit)] = true;
@@ -195,6 +200,76 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
 			temp[1] = (10**power10);                    //Resolution
 			temp[2] = (4**temp[0]-1)*temp[1]+offset;    //Max Value
 			emit PCRangeProvenEvent(ecMath.CompressPoint(total_commit), offset, temp[2], temp[1]);
+		}
+	}
+	
+	//VerifyPCBulletProof
+	function VerifyPCBulletProof(   uint256[] bpSerialized,
+									uint256[] power10, uint256[] offsets)
+		public requireECMath requireBulletproofVerify returns (bool success)
+	{
+	    //Deserialize Bullet Proof
+	    BulletproofStruct.Data[] memory args = BulletproofStruct.Deserialize(bpSerialized);
+	    
+	    //Check inputs for each proof
+	    uint256 p;
+	    uint256 i;
+		uint256 index;
+	    for (p = 0; p < args.length; p++) {
+    		//Check inputs
+    		if (args[p].V.length < 2) return false;
+    		if (args[p].V.length % 2 != 0) return false;
+    		
+    		//Limit power10, offsets, and N so that commitments do not overflow (even if "positive")
+    		if (args[p].N > 64) return false;
+    		for (i = 0; i < offsets.length; i++) {
+    			if (offsets[i] > (ecMath.GetNCurve() / 4)) return false;
+    			if (power10[i] > 35) return false;
+    		}
+    		
+    		//Count number of committments
+    		index += (args[p].V.length / 2);
+	    }
+	    
+	    //Check offsets and power10 length
+	    if (offsets.length != index) return false;
+    	if (power10.length != index) return false;
+		
+		//Verify Bulletproof(s)
+		success = bpVerify.VerifyBulletproof(BulletproofStruct.Serialize(args));
+		
+		uint256[2] memory point;
+		uint256[2] memory temp;
+		if (success) {
+			//Add known powers of 10 and offsets to committments and mark as positive
+			//Note that multiplying the commitment by a power of 10 also affects the blinding factor as well
+			index = 0;
+			for (p = 0; p < args.length; i++) {
+				for (i = 0; i < args[p].V.length; i++) {
+				    //Pull commitment
+				    point = [args[p].V[index], args[p].V[index+1]];
+				    
+    				//Calculate (10^power10)*V = (10^power10)*(v*H + bf*G1) = v*(10^power10)*H + bf*(10^power10)*G1
+    				if (power10[index] > 0) {
+    					point = ecMath.Multiply(point, 10**power10[index]);
+    				}
+    			
+    				//Calculate V + offset*H = v*H + bf*G1 + offset*H = (v + offset)*H + bf*G1
+    				if (offsets[index] > 0) {
+    					point = ecMath.AddMultiplyH(point, offsets[index]);
+    				}
+    				
+    				//Mark balance as positive
+    				point[0] = ecMath.CompressPoint(point);
+    				balance_positive[point[0]] = true;
+    				
+    				//Emit event
+    				temp[0] = (10**power10[index]);                     //Resolution
+    				temp[1] = (4**args[p].N-1)*temp[0]+offsets[index];  //Max Value
+    				emit PCRangeProvenEvent(point[0], offsets[index], temp[1], temp[0]);
+    				index++;
+				}
+			}
 		}
 	}
 	
@@ -223,7 +298,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
 	//		  The actual MLSAG signs an array of n*(m+1) points as the last column is a summation of each public key in the vector
 	//		  as well as each input commitment in the vector and the summation of all output commitments (sigma(Pj) + sigma(Cinj) - sigma(Couti))
 	//Note 2: See https://eprint.iacr.org/2015/1098 for more details on RingCT
-    function Send(ValidateRingCTTxStruct.Data args)
+    function Send(RingCTTxStruct.Data args)
         internal requireECMath requireRingCTTxVerify returns (bool success)
     {
 		//Verify output commitments have been proven positive
@@ -233,7 +308,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
         if (!CheckKeyImages(args.I)) return false;
 		
 		//Check Ring CT Tx for Validity
-        if (!ringcttxverify.ValidateRingCTTx(ValidateRingCTTxStruct.Serialize(args))) return false;
+        if (!ringcttxverify.ValidateRingCTTx(RingCTTxStruct.Serialize(args))) return false;
 		
 		//Spend UTXOs and generate new UTXOs					
 		ProcessRingCTTx(args.output_tx, args.I);
@@ -251,7 +326,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
         uint256[] memory input_values = FetchCommittedValues(input_pub_keys);
         UTXO.Input[] memory input_tx = UTXO.CreateInputArray(input_pub_keys, input_values);
         
-        ValidateRingCTTxStruct.Data memory args = ValidateRingCTTxStruct.Data(0, 0, input_tx, output_tx, I, signature);
+        RingCTTxStruct.Data memory args = RingCTTxStruct.Data(0, 0, input_tx, output_tx, I, signature);
         return Send(args);
     }
     
@@ -267,7 +342,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
 	//
 	//Note: Every withdrawal must create at least one new masked UTXO, otherwise the privacy of all spent input public keys are compromised.
 	//		(The network will know which key vector has been spent.)  At a minimum, one new UTXO may be created with a commitment to zero.
-    function Withdraw(ValidateRingCTTxStruct.Data args)
+    function Withdraw(RingCTTxStruct.Data args)
         internal requireECMath requireRingCTTxVerify returns (bool success)
     {
 		//Verify output commitments have been proven positive
@@ -277,7 +352,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
         if (!CheckKeyImages(args.I)) return false;
 		
 		//Check Ring CT Tx for Validity
-        if (!ringcttxverify.ValidateRingCTTx(ValidateRingCTTxStruct.Serialize(args))) return false;
+        if (!ringcttxverify.ValidateRingCTTx(RingCTTxStruct.Serialize(args))) return false;
         
 		//Spend UTXOs and generate new UTXOs					
 		ProcessRingCTTx(args.output_tx, args.I);
@@ -308,7 +383,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface {
         uint256[] memory input_values = FetchCommittedValues(input_pub_keys);
         UTXO.Input[] memory input_tx = UTXO.CreateInputArray(input_pub_keys, input_values);
         
-        ValidateRingCTTxStruct.Data memory args = ValidateRingCTTxStruct.Data(redeem_eth_address, redeem_eth_value, input_tx, output_tx, I, signature);
+        RingCTTxStruct.Data memory args = RingCTTxStruct.Data(redeem_eth_address, redeem_eth_value, input_tx, output_tx, I, signature);
         return Withdraw(args);
     }
 }

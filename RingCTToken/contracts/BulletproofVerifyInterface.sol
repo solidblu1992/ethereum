@@ -1,6 +1,7 @@
 pragma solidity ^0.4.22;
 
 import "./Debuggable.sol";
+import "./libBulletproofStruct.sol";
 
 //Contract interface for calling ECMath contract stored else-where on chain
 contract BulletproofVerify {

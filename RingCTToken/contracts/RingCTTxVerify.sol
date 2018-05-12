@@ -4,8 +4,8 @@ import "./Debuggable.sol";
 import "./ECMathInterface.sol";
 import "./MLSAGVerifyInterface.sol";
 import "./libUTXO.sol";
-import "./libVerifyPCRangeProofStruct.sol";
-import "./libValidateRingCTTxStruct.sol";
+import "./libBorromeanRangeProofStruct.sol";
+import "./libRingCTTxStruct.sol";
 
 contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
@@ -25,7 +25,7 @@ contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
     }
 	
     //Constructs full MLSAG for Ring CT Transaction and Verifes
-	function ValidateRingCTTx(ValidateRingCTTxStruct.Data args)
+	function ValidateRingCTTx(RingCTTxStruct.Data args)
 		internal view requireECMath requireMLSAGVerify returns (bool)
 	{
 		//Need at least one destination
@@ -105,11 +105,11 @@ contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
 	function ValidateRingCTTx(uint256[] argsSerialized)
 	    public view returns (bool)
 	{	    
-	    return ValidateRingCTTx(ValidateRingCTTxStruct.Deserialize(argsSerialized));
+	    return ValidateRingCTTx(RingCTTxStruct.Deserialize(argsSerialized));
 	}
 	
     //Verifies range proof for given commitment.  Returns if commitment is proven to be positive
-    function VerifyPCRangeProof(VerifyPCRangeProofStruct.Data args)
+    function VerifyBorromeanRangeProof(BorromeanRangeProofStruct.Data args)
         internal view requireECMath requireMLSAGVerify returns (bool success)
     {
         //Get number of bits to prove
@@ -172,7 +172,7 @@ contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
 	function VerifyPCRangeProof(uint256[] argsSerialized)
 	    public view returns (bool)
 	{	    
-	    return VerifyPCRangeProof(VerifyPCRangeProofStruct.Deserialize(argsSerialized));
+	    return VerifyBorromeanRangeProof(BorromeanRangeProofStruct.Deserialize(argsSerialized));
 	}
     
     //Utility Functions

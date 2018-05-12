@@ -12,6 +12,7 @@ contract BulletproofVerify is ECMathInterface {
 	    RefreshECMathParameters();
 	}
 	
+	//Update locally stored ECMath parameters
 	function RefreshECMathParameters() ownerOnly requireECMath public {
 	    NCurve = ecMath.GetNCurve();
 	}

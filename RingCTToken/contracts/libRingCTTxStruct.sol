@@ -2,7 +2,7 @@ pragma solidity ^0.4.22;
 
 import "./libUTXO.sol";
 
-library ValidateRingCTTxStruct {
+library RingCTTxStruct {
     //Structure for ValidateRingCTTx() arguments
     struct Data {
 		address redeem_eth_address;
@@ -13,7 +13,7 @@ library ValidateRingCTTxStruct {
 		uint256[] signature;
 	}
     
-    //Creates Validate RingCT Tx Args struct from uint256 array
+    //Creates RingCT Tx Args struct from uint256 array
 	function Deserialize(uint256[] argsSerialized)
 		internal pure returns (Data args)
 	{
@@ -69,7 +69,7 @@ library ValidateRingCTTxStruct {
 		}
 	}
 	
-	//Decomposes Validate Ring CT Tx Args struct into uint256 array
+	//Decomposes Ring CT Tx Args struct into uint256 array
 	function Serialize(Data args)
 		internal pure returns (uint256[] argsSerialized)
 	{
@@ -115,7 +115,7 @@ library ValidateRingCTTxStruct {
 		}
 	}
 	
-	function EchoTest(uint256[] argsSerialized) public constant returns (uint256[]) {
+	function EchoTest(uint256[] argsSerialized) public pure returns (uint256[]) {
 	    return Serialize(Deserialize(argsSerialized));
 	}
 }

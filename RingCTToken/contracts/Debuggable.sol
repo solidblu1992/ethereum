@@ -18,4 +18,5 @@ contract Debuggable {
 	}
 	
 	event DebugEvent(string marker, uint256 data);
+	event DebugEvent2(string marker, uint256[] data);
 }

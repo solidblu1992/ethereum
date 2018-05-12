@@ -1,6 +1,6 @@
 pragma solidity ^0.4.22;
 
-library VerifyPCRangeProofStruct {
+library BorromeanRangeProofStruct {
 	//Structure for VerifyPCRangeProof() arguments
 	struct Data {
 		uint256[2] total_commit;
@@ -10,7 +10,7 @@ library VerifyPCRangeProofStruct {
 		uint256[] signature;
 	}
 	
-	//Creates Verify PC Range Proof Args struct from uint256 array
+	//Creates Borromean Range Proof Args struct from uint256 array
 	function Deserialize(uint256[] argsSerialized)
 		internal pure returns (Data args)
 	{
@@ -47,7 +47,7 @@ library VerifyPCRangeProofStruct {
 		}
 	}
 	
-	//Decomposes Validate Ring CT Tx Args struct into uint256 array
+	//Decomposes Borromean Range Proof Args struct into uint256 array
 	function Serialize(Data args)
 		internal pure returns (uint256[] argsSerialized)
 	{
@@ -72,7 +72,7 @@ library VerifyPCRangeProofStruct {
 		}
 	}
 	
-	function EchoTest(uint256[] argsSerialized) public constant returns (uint256[]) {
+	function EchoTest(uint256[] argsSerialized) public pure returns (uint256[]) {
 	    return Serialize(Deserialize(argsSerialized));
 	}
 }

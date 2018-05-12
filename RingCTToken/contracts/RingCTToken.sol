@@ -7,8 +7,8 @@ import "./BulletproofVerifyInterface.sol";
 
 contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVerifyInterface {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
-	constructor(address ringCTVerifyAddr, address ecMathAddr, address bpVerifyAddr)
-		RingCTTxVerifyInterface(ringCTVerifyAddr) ECMathInterface(ecMathAddr) BulletproofVerifyInterface(bpVerifyAddr) public
+	constructor(address ecMathAddr, address bpVerifyAddr, address ringCTVerifyAddr)
+		ECMathInterface(ecMathAddr) BulletproofVerifyInterface(bpVerifyAddr) RingCTTxVerifyInterface(ringCTVerifyAddr) public
 	{
 		//Nothing left to do
 	}
@@ -170,42 +170,31 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 		}
 	}
 	
-	//VerifyPCRangeProof
-    //total_commit = uncompressed EC Point for total hidden value (pederen commitment)
-    //power10 = additional scalar to be applied to bitwise commitments (public information)
-    //offset = additional offset to be added to bitwise commitments (public information)
-    //bit_commits = uncompressed EC Points representing bitwise pedersen commitments
-    //signature = borromean ring signature on bitwise commitments and counter commitments (MSAG, n = 4, m = # of bits)
-    //          = { c0, s11, s12, ..., s1m,
-    //                  s21, s22, ..., s2m,
-    //                  s31, s32, ..., s3m,
-    //                  s41, s42, ..., s4m  }
-    //NOTE: Signature should be made over the following "public keys":
-    //  P = {   C1,    C2,    ..., Cm,
-    //          C1',   C2',   ..., Cm',
-    //          C1'',  C2'',  ..., Cm'',
-    //          C1''', C2''', ..., Cm''' }
-    function VerifyBorromeanRangeProof(uint256[2] total_commit, uint256 power10, uint256 offset, uint256[] bit_commits, uint256[] signature)
+	//Verify Pedersen Commitment is positive using a Borromean Range Proof
+    //Arguments are serialized to minimize stack depth.  See libBorromeanRangeProofStruct.sol
+    function VerifyPCBorromeanRangeProof(uint256[] rpSerialized)
         public requireRingCTTxVerify returns (bool success)
     {
-        BorromeanRangeProofStruct.Data memory args = BorromeanRangeProofStruct.Data(total_commit, power10, offset, bit_commits, signature);
+		//Verify Borromean Range Proof
+		success = ringcttxverify.VerifyBorromeanRangeProof(rpSerialized);
 		
-		success = ringcttxverify.VerifyBorromeanRangeProof(BorromeanRangeProofStruct.Serialize(args));
+		//Deserialize arguments
+		BorromeanRangeProofStruct.Data memory args = BorromeanRangeProofStruct.Deserialize(rpSerialized);
 		
 		if (success) {
-			balance_positive[ecMath.CompressPoint(total_commit)] = true;
+			balance_positive[ecMath.CompressPoint(args.total_commit)] = true;
 			
 			uint256[3] memory temp;
-			temp[0] = (bit_commits.length / 2);         //Bits
-			temp[1] = (10**power10);                    //Resolution
-			temp[2] = (4**temp[0]-1)*temp[1]+offset;    //Max Value
-			emit PCRangeProvenEvent(ecMath.CompressPoint(total_commit), offset, temp[2], temp[1]);
+			temp[0] = (args.bit_commits.length / 2);         //Bits
+			temp[1] = (10**args.power10);                    //Resolution
+			temp[2] = (4**temp[0]-1)*temp[1]+args.offset;    //Max Value
+			emit PCRangeProvenEvent(ecMath.CompressPoint(args.total_commit), args.offset, temp[2], temp[1]);
 		}
 	}
 	
-	//VerifyPCBulletProof
-	function VerifyPCBulletProof(   uint256[] bpSerialized,
-									uint256[] power10, uint256[] offsets)
+	//Verify Pedersen Commitment is positive using Bullet Proof(s)
+	//Arguments are serialized to minimize stack depth.  See libBulletproofStruct.sol
+	function VerifyPCBulletProof(uint256[] bpSerialized, uint256[] power10, uint256[] offsets)
 		public requireECMath requireBulletproofVerify returns (bool success)
 	{
 	    //Deserialize Bullet Proof
@@ -214,49 +203,53 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 	    //Check inputs for each proof
 	    uint256 p;
 	    uint256 i;
-		uint256 index;
+		uint256 offset_index = 0;
 	    for (p = 0; p < args.length; p++) {
     		//Check inputs
     		if (args[p].V.length < 2) return false;
     		if (args[p].V.length % 2 != 0) return false;
-    		
-    		//Limit power10, offsets, and N so that commitments do not overflow (even if "positive")
-    		if (args[p].N > 64) return false;
-    		for (i = 0; i < offsets.length; i++) {
-    			if (offsets[i] > (ecMath.GetNCurve() / 4)) return false;
-    			if (power10[i] > 35) return false;
-    		}
+			if (args[p].N > 64) return false;
     		
     		//Count number of committments
-    		index += (args[p].V.length / 2);
+    		offset_index += (args[p].V.length / 2);
 	    }
 	    
 	    //Check offsets and power10 length
-	    if (offsets.length != index) return false;
-    	if (power10.length != index) return false;
+	    if (offsets.length != offset_index) return false;
+    	if (power10.length != offset_index) return false;
+		
+		//Limit power10, offsets, and N so that commitments do not overflow (even if "positive")		
+		for (i = 0; i < offsets.length; i++) {
+			if (offsets[i] > (ecMath.GetNCurve() / 4)) return false;
+			if (power10[i] > 35) return false;
+		}
 		
 		//Verify Bulletproof(s)
 		success = bpVerify.VerifyBulletproof(BulletproofStruct.Serialize(args));
 		
+		uint256 v_index = 0;
 		uint256[2] memory point;
 		uint256[2] memory temp;
 		if (success) {
 			//Add known powers of 10 and offsets to committments and mark as positive
 			//Note that multiplying the commitment by a power of 10 also affects the blinding factor as well
-			index = 0;
+			offset_index = 0;
+			
 			for (p = 0; p < args.length; i++) {
+			    v_index = 0;
+			    
 				for (i = 0; i < args[p].V.length; i++) {
 				    //Pull commitment
-				    point = [args[p].V[index], args[p].V[index+1]];
+				    point = [args[p].V[v_index], args[p].V[v_index+1]];
 				    
     				//Calculate (10^power10)*V = (10^power10)*(v*H + bf*G1) = v*(10^power10)*H + bf*(10^power10)*G1
-    				if (power10[index] > 0) {
-    					point = ecMath.Multiply(point, 10**power10[index]);
+    				if (power10[offset_index] > 0) {
+    					point = ecMath.Multiply(point, 10**power10[offset_index]);
     				}
     			
     				//Calculate V + offset*H = v*H + bf*G1 + offset*H = (v + offset)*H + bf*G1
-    				if (offsets[index] > 0) {
-    					point = ecMath.AddMultiplyH(point, offsets[index]);
+    				if (offsets[offset_index] > 0) {
+    					point = ecMath.AddMultiplyH(point, offsets[offset_index]);
     				}
     				
     				//Mark balance as positive
@@ -264,10 +257,13 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
     				balance_positive[point[0]] = true;
     				
     				//Emit event
-    				temp[0] = (10**power10[index]);                     //Resolution
-    				temp[1] = (4**args[p].N-1)*temp[0]+offsets[index];  //Max Value
-    				emit PCRangeProvenEvent(point[0], offsets[index], temp[1], temp[0]);
-    				index++;
+    				temp[0] = (10**power10[offset_index]);                     //Resolution
+    				temp[1] = (4**args[p].N-1)*temp[0]+offsets[offset_index];  //Max Value
+    				emit PCRangeProvenEvent(point[0], offsets[offset_index], temp[1], temp[0]);
+					
+					//Increment indices
+					v_index += 2;
+					offset_index++;
 				}
 			}
 		}

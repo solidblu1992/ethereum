@@ -151,9 +151,27 @@ class PCRangeProof:
             print(bytes32_to_str(self.range_proof.signature[i]) + ",")
 
         print(bytes32_to_str(self.range_proof.signature[L-1]))
-        
-        
 
+    def Print_Serialized(self):
+        commitment = self.GetTotalCommitment()
+        L = len(self.range_proof.pub_keys) // 2
+        
+        print(hex(commitment[0].n) + ",")
+        print(hex(commitment[1].n) + ",")
+        print(str(self.pow10) + ", " + str(self.offset) + ", ", end = "")
+        print(str(L) + ", ", end = "")
+        print(str(len(self.range_proof.signature)) + ",")
+
+        for i in range(0, L // 2):
+            print(hex(self.range_proof.pub_keys[i][0].n) + ",")
+            print(hex(self.range_proof.pub_keys[i][1].n) + ",")
+
+        for i in range(0, len(self.range_proof.signature)):
+            if (i > 0):
+                print(",")
+                
+            print(hex(self.range_proof.signature[i]), end="")
+        
 class PCAESMessage:
     message = b""
     iv = b""

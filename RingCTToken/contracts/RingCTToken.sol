@@ -225,7 +225,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 		}
 		
 		//Verify Bulletproof(s)
-		success = bpVerify.VerifyBulletproof(BulletproofStruct.Serialize(args));
+		success = bpVerify.VerifyBulletproof(bpSerialized);
 		
 		uint256 v_index = 0;
 		uint256[2] memory point;

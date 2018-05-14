@@ -24,7 +24,7 @@ RingCTTxVerify (https://rinkeby.etherscan.io/address/0xd342405b028efaedc428e6f46
 
 MSLAGVerify (https://rinkeby.etherscan.io/address/0x3f667759450149ea7b3826f97ea2460cfeb413de)
 - (M)(L)SAG - (Multi-layered) (Linkable) Spontaneous Anonymous Group signature
-- Verifies many kinds of ring signatures (linkable / non-linkable, Borromean, non-Borromean).
+- Verifies many kinds of ring signatures (L = linkable / non-linkable, M = Borromean / non-Borromean).
 - Mainly used by RingCTTxVerify.  MSAG signatures are used to verify Borromean Range Proofs, while MLSAG signatures are used to verify RingCT transactions.
 - Requires and instance of ECMath.
 

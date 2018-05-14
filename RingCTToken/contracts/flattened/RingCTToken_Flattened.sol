@@ -393,10 +393,10 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 		//Verify Borromean Range Proof
 		success = ringcttxverify.VerifyBorromeanRangeProof(rpSerialized);
 		
-		//Deserialize arguments
-		BorromeanRangeProofStruct.Data memory args = BorromeanRangeProofStruct.Deserialize(rpSerialized);
-		
 		if (success) {
+		    //Deserialize arguments
+		    BorromeanRangeProofStruct.Data memory args = BorromeanRangeProofStruct.Deserialize(rpSerialized);
+		    
 			balance_positive[ecMath.CompressPoint(args.total_commit)] = true;
 			
 			uint256[3] memory temp;
@@ -419,6 +419,7 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 	    uint256 p;
 	    uint256 i;
 		uint256 offset_index = 0;
+		
 	    for (p = 0; p < args.length; p++) {
     		//Check inputs
     		if (args[p].V.length < 2) return false;
@@ -440,9 +441,8 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 		}
 		
 		//Verify Bulletproof(s)
-		success = bpVerify.VerifyBulletproof(BulletproofStruct.Serialize(args));
-		
-		uint256 v_index = 0;
+		success = bpVerify.VerifyBulletproof(bpSerialized);
+
 		uint256[2] memory point;
 		uint256[2] memory temp;
 		if (success) {
@@ -450,18 +450,18 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
 			//Note that multiplying the commitment by a power of 10 also affects the blinding factor as well
 			offset_index = 0;
 			
-			for (p = 0; p < args.length; i++) {
-				for (i = 0; i < args[p].V.length; i++) {
+			for (p = 0; p < args.length; p++) {
+				for (i = 0; i < args[p].V.length; i += 2) {
 				    //Pull commitment
-				    point = [args[p].V[v_index], args[p].V[v_index+1]];
+				    point = [args[p].V[i], args[p].V[i+1]];
 				    
     				//Calculate (10^power10)*V = (10^power10)*(v*H + bf*G1) = v*(10^power10)*H + bf*(10^power10)*G1
-    				if (power10[offset_index] > 0) {
+    				if (power10[offset_index] != 0) {
     					point = ecMath.Multiply(point, 10**power10[offset_index]);
     				}
     			
     				//Calculate V + offset*H = v*H + bf*G1 + offset*H = (v + offset)*H + bf*G1
-    				if (offsets[offset_index] > 0) {
+    				if (offsets[offset_index] != 0) {
     					point = ecMath.AddMultiplyH(point, offsets[offset_index]);
     				}
     				
@@ -471,11 +471,10 @@ contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVer
     				
     				//Emit event
     				temp[0] = (10**power10[offset_index]);                     //Resolution
-    				temp[1] = (4**args[p].N-1)*temp[0]+offsets[offset_index];  //Max Value
+    				temp[1] = (2**args[p].N-1)*temp[0]+offsets[offset_index];  //Max Value
     				emit PCRangeProvenEvent(point[0], offsets[offset_index], temp[1], temp[0]);
 					
 					//Increment indices
-					v_index += 2;
 					offset_index++;
 				}
 			}

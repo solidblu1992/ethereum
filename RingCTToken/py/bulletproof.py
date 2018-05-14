@@ -1,6 +1,12 @@
 from bulletproofutil import *
 
 class BulletProof:
+    total_commit = [None]
+    power10 = [0]
+    offset = [0]
+    value = [0]
+    bf = [0]
+    
     V = [None]
     A = None
     S = None
@@ -15,32 +21,54 @@ class BulletProof:
     t = 0
     N = 0
     
-    def __init__(self, V, A, S, T1, T2, taux, mu, L, R, a, b, t, N):
-            self.V = V
-            self.A = A
-            self.S = S
-            self.T1 = T1
-            self.T2 = T2
-            self.taux = taux
-            self.mu = mu
-            self.L = L
-            self.R = R
-            self.a = a
-            self.b = b
-            self.t = t
-            self.N = N
+    def __init__(self, total_commit, power10, offset, value, bf, V, A, S, T1, T2, taux, mu, L, R, a, b, t, N):
+        #Commitment data
+        self.total_commit = total_commit
+        self.power10 = power10
+        self.offset = offset
+        self.value = value
+        self.bf = bf
+
+        #Bulletproof properties
+        self.V = V
+        self.A = A
+        self.S = S
+        self.T1 = T1
+        self.T2 = T2
+        self.taux = taux
+        self.mu = mu
+        self.L = L
+        self.R = R
+        self.a = a
+        self.b = b
+        self.t = t
+        self.N = N
     
-    def Prove(v, gamma=None, N=32):
+    def Generate(v, power10=None, offset=None, gamma=None, N=32):
         if (type(v) != list):
             v = [v]
 
+        if (power10 == None):
+            power10 = [0]*len(v)
+
+        if (offset == None):
+            offset = [0]*len(v)
+
         if (gamma == None):
-            gamma = getRandom(len(v))
+            gamma = getRandom(len(v))    
+
+        if (type(power10) != list):
+            power10 = [power10]
+
+        if (type(offset) != list):
+            offset = [offset]
             
         if(type(gamma) != list):
             gamma = [gamma]
             
         assert(len(v) == len(gamma))
+        assert(len(v) == len(power10))
+        assert(len(v) == len(offset))
 
         #Make sure M is a power of 2
         import math
@@ -227,8 +255,27 @@ class BulletProof:
         #print("x_ip: " + hex(x_ip))
         #for i in range(0, len(w)):
         #    print("w[" + str(i) + "]: " + hex(w[i]))
+
+        #Generate total commitment
+        total_commit = [None]*len(V)
+
+        for i in range(0, len(V)):
+            #Store base commitment
+            total_commit[i] = V[i]
+            
+            #Multiply commitment by known power of 10, adjust blinding factor (gamma) accordingly
+            if (power10[i] > 0):
+                total_commit[i] = multiply(total_commit[i], 10**power10[i])
+                gamma[i] = sMul(gamma[i], 10**power10[i])
+
+            #Add known offset
+            if (offset[i] > 0):
+                total_commit[i] = add(total_commit[i], offset[i])
+
+            #Update value
+            v[i] = v[i]*(10**power10[i]) + offset[i]
         
-        return BulletProof(V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
+        return BulletProof(total_commit, power10, offset, v, gamma, V, A, S, T1, T2, taux, mu, L, R, aprime[0], bprime[0], t, N)
 
     #Verify batch of proofs
     def VerifyMulti(proofs):
@@ -418,7 +465,20 @@ class BulletProof:
 
     def Print(self):
         print()
-        print("Bulletproof:")
+        print("Bulletproof")
+        print("# of commitments: " + str(len(self.total_commit)))
+        print()
+        
+        for i in range(0, len(self.total_commit)):
+            print("Commitment " + str(i))
+            print("total_commit: " + print_point(CompressPoint(self.total_commit[i])))
+            print("power10: " + str(self.power10[i]))
+            print("offset: " + str(self.offset[i]))
+            print("[value: " + str(self.value[i] / 10**18) + " ETH or " + str(self.value[i]) + " wei]")
+            print("[bf: " + hex(self.bf[i]) + "]")
+            print()
+        
+        print("Proof Parameters:")
         
         for i in range(0, len(self.V)):
             print("V[" + str(i) + "]: " + print_point(CompressPoint(self.V[i])))
@@ -448,31 +508,40 @@ class BulletProof:
         print(str(1) + "," + str(len(self.V*2)) + ",")
         print(str(len(self.L*2)) + "," + str(len(self.R*2)) + ",")
         for i in range(0, len(self.V)):
-            print(hex(self.V[i][0].n) + ",")
-            print(hex(self.V[i][1].n) + ",")
-        print(hex(self.A[0].n) + ",")
-        print(hex(self.A[1].n) + ",")
-        print(hex(self.S[0].n) + ",")
-        print(hex(self.S[1].n) + ",")
-        print(hex(self.T1[0].n) + ",")
-        print(hex(self.T1[1].n) + ",")
-        print(hex(self.T2[0].n) + ",")
-        print(hex(self.T2[1].n) + ",")
+            print(point_to_str(self.V[i]) + ",")
+        print(point_to_str(self.A) + ",")
+        print(point_to_str(self.S) + ",")
+        print(point_to_str(self.T1) + ",")
+        print(point_to_str(self.T2) + ",")
         print(hex(self.taux) + ",")
         print(hex(self.mu) + ",")
 
         for i in range(0, len(self.L)):
-            print(hex(self.L[i][0].n) + ",")
-            print(hex(self.L[i][1].n) + ",")
+            print(point_to_str(self.L[i]) + ",")
 
         for i in range(0, len(self.R)):
-            print(hex(self.R[i][0].n) + ",")
-            print(hex(self.R[i][1].n) + ",")
+            print(point_to_str(self.R[i]) + ",")
 
         print(hex(self.a) + ",")
         print(hex(self.b) + ",")
         print(hex(self.t) + ",")
         print(str(self.N))
+
+        print()
+        print("power10:")
+        for i in range(0, len(self.power10)):
+            if (i > 0):
+                print(", ", end="")
+                
+            print(str(self.power10[i]), end="")
+
+        print("\n")
+        print("offset:")
+        for i in range(0, len(self.offset)):
+            if (i > 0):
+                print(", ", end="")
+                
+            print(str(self.offset[i]), end="")
 
     def PrintMultiMEW(proofs):
         if (type(proofs) == BulletProof):
@@ -610,4 +679,4 @@ def BulletProofTest4():
     print(BulletProof.VerifyMulti(bp))
     return bp
 
-#bp = BulletProofTest4()
+bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=8)

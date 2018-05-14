@@ -41,7 +41,11 @@ class PCRangeProof:
     def Generate(value, pow10, offset, bits_override, total_blinding_factor):
         #Figure out how many bits value is in base 4
         import math
-        bits = math.floor(math.log(value,4))+1
+
+        if (value == 0):
+            bits = bits_override
+        else:
+            bits = math.floor(math.log(value,4))+1
 
         if (bits_override > bits):
             bits = bits_override
@@ -156,15 +160,13 @@ class PCRangeProof:
         commitment = self.GetTotalCommitment()
         L = len(self.range_proof.pub_keys) // 2
         
-        print(hex(commitment[0].n) + ",")
-        print(hex(commitment[1].n) + ",")
+        print(point_to_str(commitment) + ",")
         print(str(self.pow10) + ", " + str(self.offset) + ", ", end = "")
         print(str(L) + ", ", end = "")
         print(str(len(self.range_proof.signature)) + ",")
 
         for i in range(0, L // 2):
-            print(hex(self.range_proof.pub_keys[i][0].n) + ",")
-            print(hex(self.range_proof.pub_keys[i][1].n) + ",")
+            print(point_to_str(self.range_proof.pub_keys[i]) + ",")
 
         for i in range(0, len(self.range_proof.signature)):
             if (i > 0):

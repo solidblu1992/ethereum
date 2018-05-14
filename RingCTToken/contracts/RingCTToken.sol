@@ -4,7 +4,7 @@ import "./Debuggable.sol";
 import "./ECMathInterface.sol";
 import "./RingCTTxVerifyInterface.sol";
 import "./BulletproofVerifyInterface.sol";
-
+//"0x4552c90db760d5380921e18377a41edcff8d100e", "0xa4481352f57715c05b60bad3dc33650b6ecc45d7", "0xc896a3c8ac3b622bf57fe5415002acc38729b70e"
 contract RingCTToken is RingCTTxVerifyInterface, ECMathInterface, BulletproofVerifyInterface {
 	//Contstructor Function - Initializes Prerequisite Contract(s)
 	constructor(address ecMathAddr, address bpVerifyAddr, address ringCTVerifyAddr)

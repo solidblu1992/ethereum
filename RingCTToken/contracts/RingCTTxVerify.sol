@@ -168,8 +168,8 @@ contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
         success = mlsagVerify.VerifyMSAG(bits, ecMath.CompressPoint(args.total_commit), P, args.signature);
     }
     
-    //Serialized version of VerifyPCRangeProof.  This version does not use structs so that it can be called publicly.
-	function VerifyPCRangeProof(uint256[] argsSerialized)
+    //Serialized version of VerifyBorromeanRangeProof.  This version does not use structs so that it can be called publicly.
+	function VerifyBorromeanRangeProof(uint256[] argsSerialized)
 	    public view returns (bool)
 	{	    
 	    return VerifyBorromeanRangeProof(BorromeanRangeProofStruct.Deserialize(argsSerialized));

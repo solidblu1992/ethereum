@@ -5,11 +5,13 @@ RingCTToken (https://rinkeby.etherscan.io/address/0x94820259a6c590615381b25057ff
 - The underlying RingCT protocol aims to create a fungible and private token.  This is accomplished through the combination of linkable ring signatures, output stealth addresses, and confidential transactions.  Ring signatures obfuscate information about the sender, stealth address obfuscate information about the receiver(s), and confidential transactions obfuscate the number of tokens sent.
 - RingCT Tokens are backed and redeemable 1:1 for ETH.
 - Requires an instance of ECMath, RingCTTxVerify, and BulletproofVerify (accessed through calls)
+- For more information about the protocol see the paper by [Shen Noether](https://eprint.iacr.org/2015/1098).
 
 BulletproofVerify (https://rinkeby.etherscan.io/address/0xa4481352f57715c05b60bad3dc33650b6ecc45d7)
 
 - Contract which handle the verifcation of Bullet Proofs.  This is one of two methods for proving that output pedersen commitments are positive.  Proofs can prove multiple commitments at once, and multiple proofs can be verified at once.  This contract is mainly utilzed through the RingCTToken contract via VerifyPCBulletProof().
 - Requires an instance of ECMath (accessed through calls)
+- For more information about Bullet Proofs, see the paper by [Bootle et all](https://eprint.iacr.org/2017/1066) and [Monero's blog post](https://getmonero.org/2017/12/07/Monero-Compatible-Bulletproofs.html).
 
 RingCTTxVerify (https://rinkeby.etherscan.io/address/0xd342405b028efaedc428e6f46e737db8bf083081)
 

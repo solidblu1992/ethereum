@@ -547,7 +547,7 @@ class BulletProof:
         if (type(proofs) == BulletProof):
             proofs = [proofs]
             
-        print("Multi Bullet Proof:")
+        print("Bullet Proof:")
         print("argsSerialized:")
         print(str(len(proofs)) + ",")
         for i in range(0, len(proofs)):
@@ -557,31 +557,39 @@ class BulletProof:
             print(str(len(proofs[i].V*2)) + ",")
             print(str(len(proofs[i].L*2)) + "," + str(len(proofs[i].R*2)) + ",")
             for j in range(0, len(proofs[i].V)):
-                print(hex(proofs[i].V[j][0].n) + ",")
-                print(hex(proofs[i].V[j][1].n) + ",")
-            print(hex(proofs[i].A[0].n) + ",")
-            print(hex(proofs[i].A[1].n) + ",")
-            print(hex(proofs[i].S[0].n) + ",")
-            print(hex(proofs[i].S[1].n) + ",")
-            print(hex(proofs[i].T1[0].n) + ",")
-            print(hex(proofs[i].T1[1].n) + ",")
-            print(hex(proofs[i].T2[0].n) + ",")
-            print(hex(proofs[i].T2[1].n) + ",")
+                print(point_to_str(proofs[i].V[j]) + ",")
+            print(point_to_str(proofs[i].A) + ",")
+            print(point_to_str(proofs[i].S) + ",")
+            print(point_to_str(proofs[i].T1) + ",")
+            print(point_to_str(proofs[i].T2) + ",")
             print(hex(proofs[i].taux) + ",")
             print(hex(proofs[i].mu) + ",")
 
             for j in range(0, len(proofs[i].L)):
-                print(hex(proofs[i].L[j][0].n) + ",")
-                print(hex(proofs[i].L[j][1].n) + ",")
+                print(point_to_str(proofs[i].L[j]) + ",")
 
             for j in range(0, len(proofs[i].R)):
-                print(hex(proofs[i].R[j][0].n) + ",")
-                print(hex(proofs[i].R[j][1].n) + ",")
+                print(point_to_str(proofs[i].R[j]) + ",")
 
             print(hex(proofs[i].a) + ",")
             print(hex(proofs[i].b) + ",")
             print(hex(proofs[i].t) + ",")
-            print(str(proofs[i].N), end="")
+            print(str(proofs[i].N))
+
+        print("power10:")
+        for i in range(0, len(proofs)):
+            for j in range(0, len(proofs[i].power10)):
+                if (i > 0 or j > 0):
+                    print(", ", end="")
+                print(str(proofs[i].power10[j]), end="")
+
+        print("\n")
+        print("offset:")
+        for i in range(0, len(proofs)):
+            for j in range(0, len(proofs[i].offset)):
+                if (i > 0 or j > 0):
+                    print(", ", end="")
+                print(str(proofs[i].offset[j]), end="")
 
 def BulletProofTest1():
     #Test verifying two bullet proofs with same number of commtiments and values of N
@@ -679,4 +687,19 @@ def BulletProofTest4():
     print(BulletProof.VerifyMulti(bp))
     return bp
 
-bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=8)
+#Single Bullet Proofs
+#bp = BulletProof.Generate(5, 17, 0, N=4)
+#bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=4)
+#bp = BulletProof.Generate([5]*4, [17]*4, [0]*4, N=4)
+#bp = BulletProof.Generate([5]*8, [17]*8, [0]*8, N=4)
+#bp.Print_MEW()
+
+#Multiple Bullet Proofs
+p = 2 #Number of Proofs
+m = 2 #Commitments per Proof
+bits = 16
+bp = [None]*p
+for i in range(0, p):
+    bp[i] = BulletProof.Generate([5]*m, [17]*m, [0]*m, N=bits)
+
+BulletProof.PrintMultiMEW(bp)

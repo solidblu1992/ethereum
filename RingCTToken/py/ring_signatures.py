@@ -1,4 +1,3 @@
-from bn128_curve import *
 from util import *
 import sha3
 

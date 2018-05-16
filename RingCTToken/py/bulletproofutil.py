@@ -167,7 +167,7 @@ def pvExp(a, b):
     assert(len(Gi) >= len(a))
     assert(len(Hi) >= len(a))
 
-    out = None
+    out = NullPoint
     for i in range(0, len(a)):
         out = add(out, multiply(Gi[i], a[i]))
         out = add(out, multiply(Hi[i], b[i]))
@@ -179,7 +179,7 @@ def pvExpCustom(A, B, a, b):
     assert(len(A) == len(a))
     assert(len(A) == len(b))
 
-    out = None
+    out = NullPoint
     for i in range(0, len(a)):
         out = add(out, multiply(A[i], a[i]))
         out = add(out, multiply(B[i], b[i]))
@@ -189,14 +189,14 @@ def pvExpCustom(A, B, a, b):
 def pvAdd(A, B):
     assert(len(A) == len(B))
 
-    out = [None]*len(A)
+    out = [NullPoint]*len(A)
     for i in range(0, len(A)):
         out[i] = add(A[i], B[i])
 
     return out
 
 def pvScale(A, s):
-    out = [None]*len(A)
+    out = [NullPoint]*len(A)
     for i in range(0, len(A)):
         out[i] = multiply(A[i], s)
 
@@ -205,7 +205,7 @@ def pvScale(A, s):
 def pvMul(A, a):
     assert(len(A) == len(a))
 
-    out = [None]*len(A)
+    out = [NullPoint]*len(A)
     for i in range(0, len(A)):
         out[i] = multiply(A[i], a[i])
 

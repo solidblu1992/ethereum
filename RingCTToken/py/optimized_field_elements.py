@@ -3,8 +3,9 @@ from __future__ import absolute_import
 import sys
 
 
-sys.setrecursionlimit(10000)
-
+field_modulus = 21888242871839275222246405745257275088696311157297823662689037894645226208583
+FQ12_modulus_coeffs = [82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0]  # Implied + [1]
+FQ12_mc_tuples = [(i, c) for i, c in enumerate(FQ12_modulus_coeffs) if c]
 
 # python3 compatibility
 if sys.version_info.major == 2:
@@ -13,18 +14,9 @@ else:
     int_types = (int,)
 
 
-# The prime modulus of the field
-field_modulus = 21888242871839275222246405745257275088696311157297823662689037894645226208583
-# See, it's prime!
-assert pow(2, field_modulus, field_modulus) == 2
-
-# The modulus of the polynomial in this representation of FQ12
-FQ12_modulus_coeffs = [82, 0, 0, 0, 0, 0, -18, 0, 0, 0, 0, 0]  # Implied + [1]
-
-
 # Extended euclidean algorithm to find modular inverses for
 # integers
-def inv(a, n):
+def prime_field_inv(a, n):
     if a == 0:
         return 0
     lm, hm = 1, 0
@@ -71,7 +63,7 @@ class FQ(object):
     def __div__(self, other):
         on = other.n if isinstance(other, FQ) else other
         assert isinstance(on, int_types)
-        return FQ(self.n * inv(on, field_modulus) % field_modulus)
+        return FQ(self.n * prime_field_inv(on, field_modulus) % field_modulus)
 
     def __truediv__(self, other):
         return self.__div__(other)
@@ -79,7 +71,7 @@ class FQ(object):
     def __rdiv__(self, other):
         on = other.n if isinstance(other, FQ) else other
         assert isinstance(on, int_types), on
-        return FQ(inv(self.n, field_modulus) * on % field_modulus)
+        return FQ(prime_field_inv(self.n, field_modulus) * on % field_modulus)
 
     def __rtruediv__(self, other):
         return self.__rdiv__(other)
@@ -132,20 +124,17 @@ def poly_rounded_div(a, b):
     temp = [x for x in a]
     o = [0 for x in a]
     for i in range(dega - degb, -1, -1):
-        o[i] += temp[degb + i] / b[degb]
+        o[i] = (o[i] + temp[degb + i] * prime_field_inv(b[degb], field_modulus))
         for c in range(degb + 1):
-            temp[c + i] -= o[c]
-    return o[:deg(o) + 1]
-
-
-int_types_or_FQ = (FQ,) + int_types
+            temp[c + i] = (temp[c + i] - o[c])
+    return [x % field_modulus for x in o[:deg(o) + 1]]
 
 
 # A class for elements in polynomial extension fields
 class FQP(object):
     def __init__(self, coeffs, modulus_coeffs):
         assert len(coeffs) == len(modulus_coeffs)
-        self.coeffs = [FQ(c) for c in coeffs]
+        self.coeffs = coeffs
         # The coefficients of the modulus, without the leading [1]
         self.modulus_coeffs = modulus_coeffs
         # The degree of the extension field
@@ -153,33 +142,47 @@ class FQP(object):
 
     def __add__(self, other):
         assert isinstance(other, self.__class__)
-        return self.__class__([x + y for x, y in zip(self.coeffs, other.coeffs)])
+        return self.__class__([
+            (x + y) % field_modulus
+            for x, y
+            in zip(self.coeffs, other.coeffs)
+        ])
 
     def __sub__(self, other):
         assert isinstance(other, self.__class__)
-        return self.__class__([x - y for x, y in zip(self.coeffs, other.coeffs)])
+        return self.__class__([
+            (x - y) % field_modulus
+            for x, y
+            in zip(self.coeffs, other.coeffs)
+        ])
 
     def __mul__(self, other):
-        if isinstance(other, int_types_or_FQ):
-            return self.__class__([c * other for c in self.coeffs])
+        if isinstance(other, int_types):
+            return self.__class__([c * other % field_modulus for c in self.coeffs])
         else:
-            assert isinstance(other, self.__class__)
-            b = [FQ(0) for i in range(self.degree * 2 - 1)]
-            for i in range(self.degree):
-                for j in range(self.degree):
-                    b[i + j] += self.coeffs[i] * other.coeffs[j]
-            while len(b) > self.degree:
-                exp, top = len(b) - self.degree - 1, b.pop()
-                for i in range(self.degree):
-                    b[exp + i] -= top * FQ(self.modulus_coeffs[i])
-            return self.__class__(b)
+            # assert isinstance(other, self.__class__)
+            b = [0] * (self.degree * 2 - 1)
+            inner_enumerate = list(enumerate(other.coeffs))
+            for i, eli in enumerate(self.coeffs):
+                for j, elj in inner_enumerate:
+                    b[i + j] += eli * elj
+            # MID = len(self.coeffs) // 2
+            for exp in range(self.degree - 2, -1, -1):
+                top = b.pop()
+                for i, c in self.mc_tuples:
+                    b[exp + i] -= top * c
+            return self.__class__([x % field_modulus for x in b])
 
     def __rmul__(self, other):
         return self * other
 
     def __div__(self, other):
-        if isinstance(other, int_types_or_FQ):
-            return self.__class__([c / other for c in self.coeffs])
+        if isinstance(other, int_types):
+            return self.__class__([
+                c * prime_field_inv(other, field_modulus) % field_modulus
+                for c
+                in self.coeffs
+            ])
         else:
             assert isinstance(other, self.__class__)
             return self * other.inv()
@@ -188,14 +191,14 @@ class FQP(object):
         return self.__div__(other)
 
     def __pow__(self, other):
-        if other == 0:
-            return self.__class__([1] + [0] * (self.degree - 1))
-        elif other == 1:
-            return self.__class__(self.coeffs)
-        elif other % 2 == 0:
-            return (self * self) ** (other // 2)
-        else:
-            return ((self * self) ** int(other // 2)) * self
+        o = self.__class__([1] + [0] * (self.degree - 1))
+        t = self
+        while other > 0:
+            if other & 1:
+                o = o * t
+            other >>= 1
+            t = t * t
+        return o
 
     # Extended euclidean algorithm used to find the modular inverse
     def inv(self):
@@ -206,13 +209,13 @@ class FQP(object):
             r += [0] * (self.degree + 1 - len(r))
             nm = [x for x in hm]
             new = [x for x in high]
-            assert len(set(
-                [len(lm), len(hm), len(low), len(high), len(nm), len(new), self.degree + 1]
-            )) == 1
+            # assert len(lm) == len(hm) == len(low) == len(high) == len(nm) == len(new) == self.degree + 1  # noqa: E501
             for i in range(self.degree + 1):
                 for j in range(self.degree + 1 - i):
                     nm[i + j] -= lm[i] * r[j]
                     new[i + j] -= low[i] * r[j]
+            nm = [x % field_modulus for x in nm]
+            new = [x % field_modulus for x in new]
             lm, low, hm, high = nm, new, lm, low
         return self.__class__(lm[:self.degree]) / low[0]
 
@@ -244,8 +247,9 @@ class FQP(object):
 # The quadratic extension field
 class FQ2(FQP):
     def __init__(self, coeffs):
-        self.coeffs = [FQ(c) for c in coeffs]
+        self.coeffs = coeffs
         self.modulus_coeffs = [1, 0]
+        self.mc_tuples = [(0, 1)]
         self.degree = 2
         self.__class__.degree = 2
 
@@ -253,7 +257,8 @@ class FQ2(FQP):
 # The 12th-degree extension field
 class FQ12(FQP):
     def __init__(self, coeffs):
-        self.coeffs = [FQ(c) for c in coeffs]
+        self.coeffs = coeffs
         self.modulus_coeffs = FQ12_modulus_coeffs
+        self.mc_tuples = FQ12_mc_tuples
         self.degree = 12
         self.__class__.degree = 12

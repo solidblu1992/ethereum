@@ -1,21 +1,21 @@
 from bulletproofutil import *
 
 class BulletProof:
-    total_commit = [None]
+    total_commit = [NullPoint]
     power10 = [0]
     offset = [0]
     value = [0]
     bf = [0]
     
-    V = [None]
-    A = None
-    S = None
-    T1 = None
-    T2 = None
+    V = [NullPoint]
+    A = NullPoint
+    S = NullPoint
+    T1 = NullPoint
+    T2 = NullPoint
     taux = 0
     mu = 0
-    L = [None]
-    R = [None]
+    L = [NullPoint]
+    R = [NullPoint]
     a = 0
     b = 0
     t = 0
@@ -97,7 +97,7 @@ class BulletProof:
         assert(len(Hi) >= (M*N))
 
         #Create V[]
-        V = [None]*M
+        V = [(FQ(0), FQ(0), FQ(0))]*M
         for i in range(0, M):
             V[i] = add(multiply(H, v[i]), multiply(G1, gamma[i]))
 
@@ -203,8 +203,8 @@ class BulletProof:
         bprime = r
 
         #Calculate L and R
-        L = [None]*logMN
-        R = [None]*logMN
+        L = [NullPoint]*logMN
+        R = [NullPoint]*logMN
         w = [0]*logMN
         
         nprime = M*N
@@ -257,7 +257,7 @@ class BulletProof:
         #    print("w[" + str(i) + "]: " + hex(w[i]))
 
         #Generate total commitment
-        total_commit = [None]*len(V)
+        total_commit = [NullPoint]*len(V)
 
         for i in range(0, len(V)):
             #Store base commitment
@@ -293,12 +293,12 @@ class BulletProof:
         #Initialize variables for checks
         y0 = 0              #taux
         y1 = 0              #t-(k+z+Sum(y^i))
-        Y2 = None           #z-V sum
-        Y3 = None           #x*T1
-        Y4 = None           #x^2*T2
-        Z0 = None           #A + xS
+        Y2 = NullPoint           #z-V sum
+        Y3 = NullPoint           #x*T1
+        Y4 = NullPoint           #x^2*T2
+        Z0 = NullPoint           #A + xS
         z1 = 0              #mu
-        Z2 = None           #Li / Ri sum
+        Z2 = NullPoint           #Li / Ri sum
         z3 = 0              #(t-ab)*x_ip
         z4 = [0]*maxMN      #g scalar sum
         z5 = [0]*maxMN      #h scalar sum
@@ -403,7 +403,7 @@ class BulletProof:
             y0 = sAdd(y0, sMul(proof.taux, weight))
             y1 = sAdd(y1, sMul(sSub(proof.t, sAdd(k, sMul(z, vSum(vpy)))), weight))
 
-            temp = None
+            temp = NullPoint
             for j in range(0, M):
                 temp = add(temp, multiply(proof.V[j], sPow(z, j+2)))
                 
@@ -415,7 +415,7 @@ class BulletProof:
             Z0 = add(Z0, multiply(add(proof.A, multiply(proof.S, x)), weight))
             z1 = sAdd(z1, sMul(proof.mu, weight))
 
-            temp = None
+            temp = NullPoint
             for i in range(0, logMN):
                 temp = add(temp, multiply(proof.L[i], sSq(w[i])))
                 temp = add(temp, multiply(proof.R[i], sSq(sInv(w[i]))))
@@ -452,8 +452,8 @@ class BulletProof:
                 print("z4[" + str(i) + "]: " + hex(z4[i]))
             for i in range(0, len(z5)):
                 print("z5[" + str(i) + "]: " + hex(z5[i]))            
-
-        if (Check2 != neg(Z2)):
+        
+        if (not eq(Check2, neg(Z2))):
             print("Stage 2 Check Failed!")
             return False
         else:
@@ -576,6 +576,7 @@ class BulletProof:
             print(hex(proofs[i].t) + ",")
             print(str(proofs[i].N))
 
+        print()
         print("power10:")
         for i in range(0, len(proofs)):
             for j in range(0, len(proofs[i].power10)):
@@ -688,18 +689,22 @@ def BulletProofTest4():
     return bp
 
 #Single Bullet Proofs
-#bp = BulletProof.Generate(5, 17, 0, N=4)
-#bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=4)
-#bp = BulletProof.Generate([5]*4, [17]*4, [0]*4, N=4)
-#bp = BulletProof.Generate([5]*8, [17]*8, [0]*8, N=4)
-#bp.Print_MEW()
+if (False):
+    print("Generating Single Bullet Proofs...")
+    bp = BulletProof.Generate(5, 17, 0, N=4)
+    #bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=4)
+    #bp = BulletProof.Generate([5]*4, [17]*4, [0]*4, N=4)
+    #bp = BulletProof.Generate([5]*8, [17]*8, [0]*8, N=4)
+    bp.Print_MEW()
 
 #Multiple Bullet Proofs
-p = 2 #Number of Proofs
-m = 2 #Commitments per Proof
-bits = 16
-bp = [None]*p
-for i in range(0, p):
-    bp[i] = BulletProof.Generate([5]*m, [17]*m, [0]*m, N=bits)
+if (True):
+    print("Generating Multiple Bullet Proofs...")
+    p = 2 #Number of Proofs
+    m = 2 #Commitments per Proof
+    bits = 16
+    bp = [None]*p
+    for i in range(0, p):
+        bp[i] = BulletProof.Generate([5]*m, [17]*m, [0]*m, N=bits)
 
-BulletProof.PrintMultiMEW(bp)
+    BulletProof.PrintMultiMEW(bp)

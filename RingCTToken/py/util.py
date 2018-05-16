@@ -1,10 +1,12 @@
-from bn128_curve import *
+#from bn128_curve import *
+from optimized_curve import *
 import sha3
 
 #alt_bn_128 curve parameters
 Ncurve = curve_order
 Pcurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
 ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000
+NullPoint = (FQ(0), FQ(0), FQ(0))
 
 def bytes_to_int(bytes):
     result = 0
@@ -62,7 +64,7 @@ def int_to_bytes16(i):
     return x
 
 def to_point(x, y):
-    return (FQ(x), FQ(y))
+    return (FQ(x), FQ(y), FQ(1))
 
 def bytes32_to_str(b):
     s = hex(b)
@@ -76,6 +78,7 @@ def bytes32_to_str(b):
 
 def print_point(p):
     if (type(p) == tuple):
+        p = normalize(p)
         s = hex(p[0].n)
 
         if (len(s) != 66):
@@ -105,6 +108,8 @@ def print_point(p):
 def point_to_str(p):
     if (type(p) != tuple):
         p = ExpandPoint(p)
+
+    p = normalize(p)
     
     s = (bytes32_to_str(p[0].n) + ",\n" + bytes32_to_str(p[1].n))
     return s
@@ -115,6 +120,7 @@ def hash_of_int(i):
     return x
 
 def hash_of_point(p):
+    p = normalize(p)
     hasher = sha3.keccak_256()
     hasher.update(int_to_bytes32(p[0].n))
     hasher.update(int_to_bytes32(p[1].n))
@@ -137,13 +143,14 @@ def hash_to_point(p):
         if(not(onCurve)):
             x = x + 1
 
-    return (FQ(x), FQ(y))
+    return (FQ(x), FQ(y), FQ(1))
 
 #Definition of H = hash_to_point(G1)
 H = hash_to_point(G1)
 
 #Utility Functions
 def CompressPoint(Pin):
+    Pin = normalize(Pin)
     Pout = Pin[0].n
     if ( (Pin[1].n & 0x1) == 0x1):
         Pout = Pout | ECSignMask
@@ -159,14 +166,14 @@ def ExpandPoint(Pin):
 
     if ((Pin & ECSignMask) == 0):
         if ( (y & 0x1) == 0 ):
-            Pout = (FQ(x), FQ(y))
+            Pout = (FQ(x), FQ(y), FQ(1))
         else:
-            Pout = (FQ(x), FQ(Pcurve-y))
+            Pout = (FQ(x), FQ(Pcurve-y), FQ(1))
     else:
         if ( (y & 0x1) == 0 ):
-            Pout = (FQ(x), FQ(Pcurve-y))
+            Pout = (FQ(x), FQ(Pcurve-y), FQ(1))
         else:
-            Pout = (FQ(x), FQ(y))
+            Pout = (FQ(x), FQ(y), FQ(1))
 
     return Pout
 

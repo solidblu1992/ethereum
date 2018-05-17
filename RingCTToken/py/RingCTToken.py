@@ -201,7 +201,7 @@ class RingCTToken:
         return (owned, duplicate)
 
     #Generate Send Tx
-    def SendTx(self, UTXOindices, mixins=2, output_values=None, pubViewKey=None, pubSpendKey=None):
+    def GenerateSendTx(self, UTXOindices, mixins=2, output_values=None, pubViewKeys=None, pubSpendKeys=None):
         UTXOindices = list(set(UTXOindices)) #remove duplicates
         mixin_count = len(UTXOindices)*mixins
         assert((len(self.MixinTxPool)+len(self.MyUTXOPool)-len(UTXOindices)) >= mixin_count) #Must have enough mixin transactions to perform Tx
@@ -249,15 +249,15 @@ class RingCTToken:
         for i in range(0, len(in_values)):
             total_out_value = total_out_value + in_values[i]
 
-        if ((pubViewKey == None) or (pubSpendKey == None)):
-            pubViewKey = self.MyPublicViewKey
-            pubSpendKey = self.MyPublicSpendKey
+        if ((pubViewKeys == None) or (pubSpendKeys == None)):
+            pubViewKeys = [self.MyPublicViewKey] * len(output_values)
+            pubSpendKeys = [self.MyPublicSpendKey] * len(output_values)
 
         #None = one output of total value
         if (output_values == None):
             output_values = [total_out_value]
         #Int = output count stored instead
-        elif (output_values != list):
+        elif (type(output_values) != list):
             v = total_out_value // output_values
             rem = total_out_value - (v*output_values)
             output_values = [v]*output_values
@@ -269,7 +269,7 @@ class RingCTToken:
                 sum_output_values = sum_output_values + output_values[i]
 
             #Check to see if enough tokens are avalable in the specified UTXO set
-            assert(sum_output_values < total_out_value)
+            assert(sum_output_values <= total_out_value)
 
             #If sum is less than avaiable tokens but not exactly equal, add remaining output value
             if (sum_output_values != total_out_value):
@@ -283,7 +283,7 @@ class RingCTToken:
             (out_rp_val, out_rp_pow10, out_rp_rem, out_rp_bits) = PCRangeProof.GenerateParameters(output_values[i], 4)
             out_bf = out_bf + [getRandom()]
             out_rp = out_rp + [PCRangeProof.Generate(out_rp_val, out_rp_pow10, out_rp_rem, 3, out_bf[i])]
-            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKey, pubSpendKey, output_values[i], out_bf[i])]        
+            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKeys[i], pubSpendKeys[i], output_values[i], out_bf[i])]        
         
         sig = RingCT.Sign(in_xk, in_values, in_bfs, mixin_tx, out_tx, output_values, out_bf)
         self.MyPendingUTXOPool = self.MyPendingUTXOPool + out_tx
@@ -310,13 +310,15 @@ class RingCTToken:
         sig.Print_MEW()
         return (out_rp, sig)
 
-    def WithdrawTx(self, redeem_eth_address, redeem_eth_value, UTXOindices, mixins=2, output_values=None, pubViewKey=None, pubSpendKey=None):
+    def GenerateWithdrawTx(self, redeem_eth_address, redeem_eth_value, UTXOindices, mixins=2, output_values=None, pubViewKeys=None, pubSpendKeys=None):
         UTXOindices = list(set(UTXOindices)) #remove duplicates
         mixin_count = len(UTXOindices)*mixins
-        assert((len(self.MixinTxPool)+len(self.MyUTXOPool)-len(UTXOindices)) >= mixin_count) #Must have enough mixin transactions to perform Tx
+        if ((len(self.MixinTxPool)+len(self.MyUTXOPool)-len(UTXOindices)) < mixin_count):
+            print("Generate Tx failed! Not enough mixins! (req: " + str(mixin_count) + ", have: " + str(len(self.MixinTxPool)+len(self.MyUTXOPool)-len(UTXOindices)) + ")")
+            assert(False)
         assert((redeem_eth_value > 0) and (redeem_eth_value < (Ncurve // 2)))
 
-        print("Generating Spend Tx...")
+        print("Generating Withdraw Tx...")
 
         #Get Private Keys, values, and blinding factors from UTXO set
         in_utxos = []
@@ -362,15 +364,15 @@ class RingCTToken:
         assert(total_out_value >= redeem_eth_value)
         total_out_value = total_out_value - redeem_eth_value
 
-        if ((pubViewKey == None) or (pubSpendKey == None)):
-            pubViewKey = self.MyPublicViewKey
-            pubSpendKey = self.MyPublicSpendKey
+        if ((pubViewKeys == None) or (pubSpendKeys == None)):
+            pubViewKeys = [self.MyPublicViewKey] * len(output_values)
+            pubSpendKeys = [self.MyPublicSpendKey] * len(output_values)
 
         #None = one output of total value
         if (output_values == None):
             output_values = [total_out_value]
         #Int = output count stored instead
-        elif (output_values != list):
+        elif (type(output_values) != list):
             v = total_out_value // output_values
             rem = total_out_value - (v*output_values)
             output_values = [v]*output_values
@@ -396,7 +398,7 @@ class RingCTToken:
             (out_rp_val, out_rp_pow10, out_rp_rem, out_rp_bits) = PCRangeProof.GenerateParameters(output_values[i], 4)
             out_bf = out_bf + [getRandom()]
             out_rp = out_rp + [PCRangeProof.Generate(out_rp_val, out_rp_pow10, out_rp_rem, 3, out_bf[i])]
-            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKey, pubSpendKey, output_values[i], out_bf[i])]
+            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKeys[i], pubSpendKeys[i], output_values[i], out_bf[i])]
             
         sig = RingCT.Sign(in_xk, in_values, in_bfs, mixin_tx, out_tx, output_values, out_bf, redeem_eth_address, redeem_eth_value)
         self.MyPendingUTXOPool = self.MyPendingUTXOPool + out_tx
@@ -418,11 +420,85 @@ class RingCTToken:
         
         #Print Send Data
         print("============================================")
-        print("Send Tx Data")
+        print("Withdraw Tx Data")
         print("============================================")
         sig.Print_MEW()
         return (out_rp, sig)
 
+    #High level functions
+    def GetBalance(self):
+        token_balance = 0
+        for i in range(len(self.MyUTXOPool)):
+            token_balance += self.MyUTXOPool[i].DecryptData(self.MyPrivateSpendKey)[0]
+
+        return token_balance
+
+    def Send(self, dest_pub_view_key, dest_pub_spend_key, value, mixin_count=3):
+        balance = self.GetBalance()
+        if (value > balance):
+            print("Failed to generate SendTx, insufficient balance (req: " + str(value / 10**18) + " ETH, have: " + str(balance / 10**18) + ")")
+
+        #Figure out which UTXOs must be spent, pick sequentially for now but may need a better algorithm to preserve privacy
+        utxo_indices = []
+        utxo_total = 0
+        utxo_remainder = 0
+        i = 0
+        while (utxo_total < value):
+            #Fetch UTXO Value
+            utxo_value = self.MyUTXOPool[i].DecryptData(self.MyPrivateSpendKey)[0]
+
+            if (utxo_value > 0):
+                #Add index
+                utxo_indices += [i]
+                
+                #Add value to utxo total
+                utxo_total += utxo_value
+
+                #Is there a remainder?
+                if (utxo_total > value):
+                    utxo_remainder = (utxo_total - value)
+                    utxo_total = value
+            
+            i += 1
+
+        #Generate Send Transaction
+        tx = self.GenerateSendTx(utxo_indices, mixin_count, [utxo_total, utxo_remainder], [dest_pub_view_key, self.MyPublicViewKey], [dest_pub_spend_key, self.MyPublicSpendKey])
+        return tx
+
+    def Withdraw(self, redeem_eth_address, value, mixin_count=3):
+        balance = self.GetBalance()
+        if (value > balance):
+            print("Failed to generate WithdrawTx, insufficient balance (req: " + str(value / 10**18) + " ETH, have: " + str(balance / 10**18) + ")")
+            
+        utxo_indices = []
+        utxo_total = 0
+        utxo_remainder = 0
+        i = 0
+        while (utxo_total < value):
+            #Fetch UTXO Value
+            utxo_value = self.MyUTXOPool[i].DecryptData(self.MyPrivateSpendKey)[0]
+
+            if (utxo_value > 0):
+                #Add index
+                utxo_indices += [i]
+                
+                #Add value to utxo total
+                utxo_total += utxo_value
+
+                #Is there a remainder?
+                if (utxo_total > value):
+                    utxo_remainder = (utxo_total - value)
+                    utxo_total = value
+            
+            i += 1
+
+        #Generate Send Transaction
+        tx = self.GenerateWithdrawTx(redeem_eth_address, value, utxo_indices, mixin_count, [utxo_remainder], [self.MyPublicViewKey], [self.MyPublicSpendKey])
+        return tx
+
+        
+
+    #Print Functions
     def PrintStealthAddress(self):
         print("Public View Key:  " + print_point(CompressPoint(self.MyPublicViewKey)))
         print("Public Spend Key: " + print_point(CompressPoint(self.MyPublicSpendKey)))

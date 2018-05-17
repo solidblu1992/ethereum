@@ -66,31 +66,11 @@ def int_to_bytes16(i):
 def to_point(x, y):
     return (FQ(x), FQ(y), FQ(1))
 
-def bytes32_to_str(b):
+def bytes_to_str(b, N=32):
     s = hex(b)
 
-    if (len(s) < 66):
-        y = 66 - len(s)
-        y = "0" * y
-        s = "0x" + y + s[2:]
-
-    return s
-
-def bytes20_to_str(b):
-    s = hex(b)
-
-    if (len(s) < 42):
-        y = 42 - len(s)
-        y = "0" * y
-        s = "0x" + y + s[2:]
-
-    return s
-
-def bytes16_to_str(b):
-    s = hex(b)
-
-    if (len(s) < 34):
-        y = 34 - len(s)
+    if (len(s) < (2*N+2)):
+        y = (2*N+2) - len(s)
         y = "0" * y
         s = "0x" + y + s[2:]
 
@@ -151,6 +131,9 @@ def KeyImage(xk):
 
 #Utility Functions
 def CompressPoint(Pin):
+    if (type(Pin) != tuple):
+        return Pin
+    
     Pin = normalize(Pin)
     Pout = Pin[0].n
     if ( (Pin[1].n & 0x1) == 0x1):

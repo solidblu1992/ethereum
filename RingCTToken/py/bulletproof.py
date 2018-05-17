@@ -99,7 +99,10 @@ class BulletProof:
         #Create V[]
         V = [(FQ(0), FQ(0), FQ(0))]*M
         for i in range(0, M):
-            V[i] = add(multiply(H, v[i]), multiply(G1, gamma[i]))
+            if (v[i] == 0):
+                V[i] = multiply(G1, gamma[i])
+            else:
+                V[i] = add(multiply(H, v[i]), multiply(G1, gamma[i]))
 
         #Create A
         aL = [0]*(M*N)
@@ -124,14 +127,11 @@ class BulletProof:
 	#Hash V[], including array length
         hasher = sha3.keccak_256(int_to_bytes32(M*2))
         for j in range(0, M):
-            hasher.update(int_to_bytes32(V[j][0].n))
-            hasher.update(int_to_bytes32(V[j][1].n))
+            hasher = add_point_to_hasher(hasher, V[j])
 
         hasher = sha3.keccak_256(hasher.digest())
-        hasher.update(int_to_bytes32(A[0].n))
-        hasher.update(int_to_bytes32(A[1].n))
-        hasher.update(int_to_bytes32(S[0].n))
-        hasher.update(int_to_bytes32(S[1].n))
+        hasher = add_point_to_hasher(hasher, A)
+        hasher = add_point_to_hasher(hasher, S)
 	
         y = bytes_to_int(hasher.digest()) % Ncurve
         hasher = sha3.keccak_256(int_to_bytes32(y))
@@ -171,10 +171,8 @@ class BulletProof:
         T2 = add(multiply(H, t2), multiply(G1, tau2))
 
         #Continue Fiat-Shamir
-        hasher.update(int_to_bytes32(T1[0].n))
-        hasher.update(int_to_bytes32(T1[1].n))
-        hasher.update(int_to_bytes32(T2[0].n))
-        hasher.update(int_to_bytes32(T2[1].n))
+        hasher = add_point_to_hasher(hasher, T1)
+        hasher = add_point_to_hasher(hasher, T2)
         x = bytes_to_int(hasher.digest()) % Ncurve
         hasher = sha3.keccak_256(int_to_bytes32(x))
       
@@ -230,10 +228,8 @@ class BulletProof:
             R[rounds] = add(pvExpCustom(gp1, hp2, ap2, bp1), multiply(H, sMul(cR, x_ip)))
 
             #Update hasher for Fiat-Shamir
-            hasher.update(int_to_bytes32(L[rounds][0].n))
-            hasher.update(int_to_bytes32(L[rounds][1].n))
-            hasher.update(int_to_bytes32(R[rounds][0].n))
-            hasher.update(int_to_bytes32(R[rounds][1].n))
+            hasher = add_point_to_hasher(hasher, L[rounds])
+            hasher = add_point_to_hasher(hasher, R[rounds])
             w[rounds] = bytes_to_int(hasher.digest()) % Ncurve
             hasher = sha3.keccak_256(int_to_bytes32(w[rounds]))
 
@@ -317,25 +313,20 @@ class BulletProof:
 			#Hash V[], including array length
             hasher = sha3.keccak_256(int_to_bytes32(M*2))
             for j in range(0, M):
-                hasher.update(int_to_bytes32(proof.V[j][0].n))
-                hasher.update(int_to_bytes32(proof.V[j][1].n))
+                hasher = add_point_to_hasher(hasher, V[j])
 
 	    #Continue Hasher
             hasher = sha3.keccak_256(hasher.digest())
-            hasher.update(int_to_bytes32(proof.A[0].n))
-            hasher.update(int_to_bytes32(proof.A[1].n))
-            hasher.update(int_to_bytes32(proof.S[0].n))
-            hasher.update(int_to_bytes32(proof.S[1].n))
+            hasher = add_point_to_hasher(hasher, A)
+            hasher = add_point_to_hasher(hasher, S)
             y = bytes_to_int(hasher.digest()) % Ncurve
             
             hasher = sha3.keccak_256(int_to_bytes32(y))
             z = bytes_to_int(hasher.digest()) % Ncurve
             
             hasher = sha3.keccak_256(int_to_bytes32(z))
-            hasher.update(int_to_bytes32(proof.T1[0].n))
-            hasher.update(int_to_bytes32(proof.T1[1].n))
-            hasher.update(int_to_bytes32(proof.T2[0].n))
-            hasher.update(int_to_bytes32(proof.T2[1].n))
+            hasher = add_point_to_hasher(hasher, T1)
+            hasher = add_point_to_hasher(hasher, T2)
             x = bytes_to_int(hasher.digest()) % Ncurve
             
             hasher = sha3.keccak_256(int_to_bytes32(x))
@@ -358,10 +349,8 @@ class BulletProof:
             #Compute inner product challenges
             w = [0]*logMN
             for i in range(0, logMN):
-                hasher.update(int_to_bytes32(proof.L[i][0].n))
-                hasher.update(int_to_bytes32(proof.L[i][1].n))
-                hasher.update(int_to_bytes32(proof.R[i][0].n))
-                hasher.update(int_to_bytes32(proof.R[i][1].n))
+                hasher = add_point_to_hasher(hasher, L[i])
+                hasher = add_point_to_hasher(hasher, R[i])
                 w[i] = bytes_to_int(hasher.digest()) % Ncurve
                 hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
@@ -471,7 +460,7 @@ class BulletProof:
         
         for i in range(0, len(self.total_commit)):
             print("Commitment " + str(i))
-            print("total_commit: " + print_point(CompressPoint(self.total_commit[i])))
+            print("total_commit: " + bytes_to_str(CompressPoint(self.total_commit[i])))
             print("power10: " + str(self.power10[i]))
             print("offset: " + str(self.offset[i]))
             print("[value: " + str(self.value[i] / 10**18) + " ETH or " + str(self.value[i]) + " wei]")
@@ -481,20 +470,20 @@ class BulletProof:
         print("Proof Parameters:")
         
         for i in range(0, len(self.V)):
-            print("V[" + str(i) + "]: " + print_point(CompressPoint(self.V[i])))
+            print("V[" + str(i) + "]: " + bytes_to_str(CompressPoint(self.V[i])))
             
-        print("A:    " + print_point(CompressPoint(self.A)))
-        print("S:    " + print_point(CompressPoint(self.S)))
-        print("T1:   " + print_point(CompressPoint(self.T1)))
-        print("T2:   " + print_point(CompressPoint(self.T2)))
+        print("A:    " + bytes_to_str(CompressPoint(self.A)))
+        print("S:    " + bytes_to_str(CompressPoint(self.S)))
+        print("T1:   " + bytes_to_str(CompressPoint(self.T1)))
+        print("T2:   " + bytes_to_str(CompressPoint(self.T2)))
         print("taux: " + hex(self.taux))
         print("mu:   " + hex(self.mu))
 
         for i in range(0, len(self.L)):
-            print("L[" + str(i) + "]: " + print_point(CompressPoint(self.L[i])))
+            print("L[" + str(i) + "]: " + bytes_to_str(CompressPoint(self.L[i])))
 
         for i in range(0, len(self.R)):
-            print("R[" + str(i) + "]: " + print_point(CompressPoint(self.R[i])))
+            print("R[" + str(i) + "]: " + bytes_to_str(CompressPoint(self.R[i])))
 
         print("a:    " + hex(self.a))
         print("b:    " + hex(self.b))
@@ -691,7 +680,7 @@ def BulletProofTest4():
 #Single Bullet Proofs
 if (True):
     print("Generating Single Bullet Proof(s)...")
-    bp = BulletProof.Generate(0, 0, 0, N=32)
+    bp = BulletProof.Generate(0, 17, 0, N=32)
     #bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=4)
     #bp = BulletProof.Generate([5]*4, [17]*4, [0]*4, N=4)
     #bp = BulletProof.Generate([5]*8, [17]*8, [0]*8, N=4)

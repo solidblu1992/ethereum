@@ -21,12 +21,15 @@ def RingCTTokenTestImport(stealth_addr, transaction_pool):
     
     return rct
 
-def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, output_count = 2):
+def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, output_count = 2, stealth_address = None):
     rct = RingCTToken()
     rct.debugPrintingEnabled = False
     
     print("Generating Initial Stealth Address...")
-    rct.GenerateNewStealthAddress()
+    if (stealth_address == None):
+        rct.GenerateNewStealthAddress()
+    else:
+        rct.SetStealthAddress(stealth_address[0], stealth_address[1])
 
     print("Generating Input Transactions for TX0...")
     value = [total_value // input_count] * input_count
@@ -63,7 +66,7 @@ def RingCTTokenTest(total_value=(10**16), input_count = 2, mixin_count = 3, outp
     
     return (rct, tx0, tx1, tx2)
 
-(rct, tx0, tx1, tx2) = RingCTTokenTest()
+#(rct, tx0, tx1, tx2) = RingCTTokenTest()
 
 #rct = RingCTTokenTestImport(StealthAddressExport, UTXOPoolExport + MixinPoolExport)
 #PrintTxExportAsDeposit(UTXOPoolExport + MixinPoolExport, StealthAddressExport)

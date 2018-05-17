@@ -17,8 +17,7 @@ class MSAG:
     def RingHashFunction(msgHash, point):
         hasher = sha3.keccak_256()
         hasher.update(msgHash)
-        hasher.update(int_to_bytes32(point[0].n))
-        hasher.update(int_to_bytes32(point[1].n))
+        hasher = add_point_to_hasher(hasher, point)
         return bytes_to_int(hasher.digest())
 
     def StartRing_NoHash(alpha):
@@ -109,8 +108,7 @@ class MSAG:
                 signature[index+1] = random[index]
                 
             #Store update c1 hash
-            hasher.update(int_to_bytes32(point[0].n))
-            hasher.update(int_to_bytes32(point[1].n))
+            hasher = add_point_to_hasher(hasher, point)
 
         #Store c1
         signature[0] = bytes_to_int(hasher.digest())
@@ -214,8 +212,7 @@ class MSAG:
                 signature[index+1] = random[index]
                 
             #Store update c1 hash
-            hasher.update(int_to_bytes32(point[0].n))
-            hasher.update(int_to_bytes32(point[1].n))
+            hasher = add_point_to_hasher(hasher, point)
 
         #Store c1
         signature[0] = bytes_to_int(hasher.digest())
@@ -287,8 +284,7 @@ class MSAG:
             point = MSAG.CalculateRingSegment_NoHash(ck, self.signature[index+1], self.pub_keys[index])
 
             #Update c1 hash
-            hasher.update(int_to_bytes32(point[0].n))
-            hasher.update(int_to_bytes32(point[1].n))
+            hasher = add_point_to_hasher(hasher, point)
                 
         #Check if ring is closed
         ck = bytes_to_int(hasher.digest())
@@ -323,10 +319,8 @@ class MLSAG:
     def LinkableRingHashFunction(msgHash, left, right):
         hasher = sha3.keccak_256()
         hasher.update(msgHash)
-        hasher.update(int_to_bytes32(left[0].n))
-        hasher.update(int_to_bytes32(left[1].n))
-        hasher.update(int_to_bytes32(right[0].n))
-        hasher.update(int_to_bytes32(right[1].n))
+        hasher = add_point_to_hasher(hasher, left)
+        hasher = add_point_to_hasher(hasher, right)
         return bytes_to_int(hasher.digest())
 
     def StartLinkableRing_NoHash(alpha, P):
@@ -428,10 +422,8 @@ class MLSAG:
                 signature[index+1] = random[index]
                 
             #Store update c1 hash
-            hasher.update(int_to_bytes32(left[0].n))
-            hasher.update(int_to_bytes32(left[1].n))
-            hasher.update(int_to_bytes32(right[0].n))
-            hasher.update(int_to_bytes32(right[1].n))
+            hasher = add_point_to_hasher(hasher, left)
+            hasher = add_point_to_hasher(hasher, right)
 
         #Store c1
         signature[0] = bytes_to_int(hasher.digest())
@@ -543,10 +535,8 @@ class MLSAG:
                 signature[index+1] = random[index]
                 
             #Store update c1 hash
-            hasher.update(int_to_bytes32(left[0].n))
-            hasher.update(int_to_bytes32(left[1].n))
-            hasher.update(int_to_bytes32(right[0].n))
-            hasher.update(int_to_bytes32(right[1].n))
+            hasher = add_point_to_hasher(hasher, left)
+            hasher = add_point_to_hasher(hasher, right)
 
         #Store c1
         signature[0] = bytes_to_int(hasher.digest())
@@ -622,10 +612,8 @@ class MLSAG:
             (left, right) = MLSAG.CalculateLinkableRingSegment_NoHash(ck, self.signature[index+1], self.pub_keys[index], self.key_images[i])
 
             #Update c1 hash
-            hasher.update(int_to_bytes32(left[0].n))
-            hasher.update(int_to_bytes32(left[1].n))
-            hasher.update(int_to_bytes32(right[0].n))
-            hasher.update(int_to_bytes32(right[1].n))
+            hasher = add_point_to_hasher(hasher, left)
+            hasher = add_point_to_hasher(hasher, right)
                 
         #Check if ring is closed
         ck = bytes_to_int(hasher.digest())
@@ -706,18 +694,6 @@ def MLSAG_Test(m=4, n=3):
         print("MLSAG Verification Success!")
     else:
         print("MLSAG Verification Failure!")
-        
-
-
-
-
-
-
-
-
-
-
-
 
 
 

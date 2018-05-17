@@ -175,24 +175,30 @@ class RingCTToken:
             print()
 
     #Import Tx's from Array
+    #Returns owned=True if Tx belongs to Stealth Address
+    #Returns duplicate=True if Tx already exists in UTXO Pool
     def AddTx(self, tx):
-        if (tx.CheckOwnership(self.MyPrivateViewKey, self.MyPublicSpendKey)):
-            duplicate = False
+        duplicate = False
+        owned = tx.CheckOwnership(self.MyPrivateViewKey, self.MyPublicSpendKey)
+
+        #Check both UTXO and Mixin Pools for duplicate transactions
+        if (owned):
             for i in range(0, len(self.MyUTXOPool)):
                 if (CompressPoint(self.MyUTXOPool[i].pub_key) == CompressPoint(tx.pub_key)):
                     duplicate = True
-
-            if (not duplicate):
-                self.MyUTXOPool = self.MyUTXOPool + [tx]
-
-        else:
-            duplicate = False
-            for i in range(0, len(self.MixinTxPool)):
+                    
+        for i in range(0, len(self.MixinTxPool)):
                 if (CompressPoint(self.MixinTxPool[i].pub_key) == CompressPoint(tx.pub_key)):
                     duplicate = True
 
-            if (not duplicate):
-                self.MixinTxPool = self.MixinTxPool + [tx]
+        #If not duplicate, add TX to relevant pool
+        if (not duplicate):
+            if (owned):
+                self.MyUTXOPool = self.MyUTXOPool + [tx]
+            else:
+                self.MixinTxPool = self.MixinTxPool + [tx]                
+
+        return (owned, duplicate)
 
     #Generate Send Tx
     def SendTx(self, UTXOindices, mixins=2, output_values=None, pubViewKey=None, pubSpendKey=None):
@@ -209,7 +215,12 @@ class RingCTToken:
         in_xk = [0] * len(UTXOindices)
         for i in range(0, len(UTXOindices)):
             in_utxos = in_utxos + [self.MyUTXOPool[UTXOindices[i]]]
-            (in_values[i], in_bfs[i]) = in_utxos[i].DecryptData(self.MyPrivateSpendKey)
+            
+            if (in_utxos[i].isEncrypted()):
+                (in_values[i], in_bfs[i]) = in_utxos[i].DecryptData(self.MyPrivateSpendKey)
+            else:
+                (in_values[i], in_bfs[i]) = (in_utxos[i].c_value, 0)
+                
             in_xk[i] = in_utxos[i].GetPrivKey(self.MyPrivateViewKey, self.MyPrivateSpendKey)
 
         #Pick random mixin transactions from spent utxos, unknown utxos, and unspent utxos
@@ -228,6 +239,10 @@ class RingCTToken:
             else:
                 index = index - len(self.MixinTxPool)
                 mixin_tx[i] = self.MyUTXOPool[rem_utxo_indices[index]]
+
+            #If Mixin TX is not encrypted, need to generate commitment to it: v*H
+            if (not mixin_tx[i].isEncrypted()):
+                mixin_tx[i].c_value = multiply(H, mixin_tx[i].c_value)
 
         #Generate output transactions
         total_out_value = 0
@@ -268,8 +283,8 @@ class RingCTToken:
             (out_rp_val, out_rp_pow10, out_rp_rem, out_rp_bits) = PCRangeProof.GenerateParameters(output_values[i], 4)
             out_bf = out_bf + [getRandom()]
             out_rp = out_rp + [PCRangeProof.Generate(out_rp_val, out_rp_pow10, out_rp_rem, 3, out_bf[i])]
-            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKey, pubSpendKey, output_values[i], out_bf[i])]
-            
+            out_tx = out_tx + [StealthTransaction.Generate_GenRandom(pubViewKey, pubSpendKey, output_values[i], out_bf[i])]        
+        
         sig = RingCT.Sign(in_xk, in_values, in_bfs, mixin_tx, out_tx, output_values, out_bf)
         self.MyPendingUTXOPool = self.MyPendingUTXOPool + out_tx
 
@@ -310,7 +325,12 @@ class RingCTToken:
         in_xk = [0] * len(UTXOindices)
         for i in range(0, len(UTXOindices)):
             in_utxos = in_utxos + [self.MyUTXOPool[UTXOindices[i]]]
-            (in_values[i], in_bfs[i]) = in_utxos[i].DecryptData(self.MyPrivateSpendKey)
+
+            if (in_utxos[i].isEncrypted()):
+                (in_values[i], in_bfs[i]) = in_utxos[i].DecryptData(self.MyPrivateSpendKey)
+            else:
+                (in_values[i], in_bfs[i]) = (in_utxos[i].c_value, 0)
+                                             
             in_xk[i] = in_utxos[i].GetPrivKey(self.MyPrivateViewKey, self.MyPrivateSpendKey)
 
         #Pick random mixin transactions from spent utxos, unknown utxos, and unspent utxos
@@ -329,6 +349,10 @@ class RingCTToken:
             else:
                 index = index - len(self.MixinTxPool)
                 mixin_tx[i] = self.MyUTXOPool[rem_utxo_indices[index]]
+
+            #If Mixin TX is not encrypted, need to generate commitment to it: v*H
+            if (not mixin_tx[i].isEncrypted()):
+                mixin_tx[i].c_value = multiply(H, mixin_tx[i].c_value)
 
         #Generate output transactions
         total_out_value = 0
@@ -408,9 +432,14 @@ class RingCTToken:
             print("UTXO " + str(i) + ":")
             print("pub key: " + hex(CompressPoint(self.MyUTXOPool[i].pub_key)))
             print("[priv key: " + hex(self.MyUTXOPool[i].GetPrivKey(self.MyPrivateViewKey, self.MyPrivateSpendKey)) + "]")
-            (v, bf) = self.MyUTXOPool[i].DecryptData(self.MyPrivateSpendKey)
-            print("[value: " + str(v) + "]")
-            print("[bf: " + hex(bf) + "]")
+
+            if (self.MyUTXOPool[i].isEncrypted()):
+                (v, bf) = self.MyUTXOPool[i].DecryptData(self.MyPrivateSpendKey)
+                print("[value: " + str(v) + "]")
+                print("[bf: " + hex(bf) + "]")
+            else:
+                print("value: " + str(self.MyUTXOPool[i].c_value))
+
             print()
 
     def PrintPendingUTXOPool(self):
@@ -418,7 +447,13 @@ class RingCTToken:
             print("Pending UTXO " + str(i) + ":")
             print("pub key: " + hex(CompressPoint(self.MyPendingUTXOPool[i].pub_key)))
             print("[priv key: " + hex(self.MyPendingUTXOPool[i].GetPrivKey(self.MyPrivateViewKey, self.MyPrivateSpendKey)) + "]")
-            (v, bf) = self.MyPendingUTXOPool[i].DecryptData(self.MyPrivateSpendKey)
+
+            if (self.MyPendingUTXOPool[i].isEncrypted()):
+                (v, bf) = self.MyPendingUTXOPool[i].DecryptData(self.MyPrivateSpendKey)
+            else:
+                v = self.MyPendingUTXOPool[i].c_value
+                bf = 0
+                
             print("[value: " + str(v) + "]")
             print("[bf: " + hex(bf) + "]")
             print()

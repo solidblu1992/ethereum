@@ -6,7 +6,7 @@ def print_pub_keys(x, m, a, n):
     print("Pub Keys")
     for i in range(0, m-a):
         for j in range(0, n):
-            if(x[j*m+i] != None):
+            if(not eq(x[j*m+i], NullPoint)):
                 print(print_point(CompressPoint(x[j*m+i])))
             else:
                 print("0x0")
@@ -84,8 +84,8 @@ class RingCT:
 
         #Pick slot for key vector
         indices = [random.randrange(0, n)] * m
-        pub_keys = [None] * (m*n)
-        input_commitments_new = [None]*((m-1)*n)
+        pub_keys = [NullPoint] * (m*n)
+        input_commitments_new = [NullPoint]*((m-1)*n)
         priv_keys = [0] * (m)
 
         #Fill in existing public / private keys and commitments
@@ -112,15 +112,12 @@ class RingCT:
             hasher = sha3.keccak_256(msgHash)
 
             #Hash pub keys, values, dhe points, and encrypted data
-            hasher.update(int_to_bytes32(output_transactions[i].pub_key[0].n))
-            hasher.update(int_to_bytes32(output_transactions[i].pub_key[1].n))
+            hasher = add_point_to_hasher(hasher, output_transactions[i].pub_key)
 
-            assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])),output_transactions[i].c_value))
-            hasher.update(int_to_bytes32(output_transactions[i].c_value[0].n))
-            hasher.update(int_to_bytes32(output_transactions[i].c_value[1].n))
+            assert(eq(add(multiply(H, out_v[i]), multiply(G1, out_bf[i])), output_transactions[i].c_value))
+            hasher = add_point_to_hasher(hasher, output_transactions[i].c_value)
 
-            hasher.update(int_to_bytes32(output_transactions[i].dhe_point[0].n))
-            hasher.update(int_to_bytes32(output_transactions[i].dhe_point[1].n))
+            hasher = add_point_to_hasher(hasher, output_transactions[i].dhe_point)
 
             hasher.update(output_transactions[i].pc_encrypted_data.message)
             hasher.update(int_to_bytes32(bytes_to_int(output_transactions[i].pc_encrypted_data.iv)))
@@ -177,7 +174,7 @@ class RingCT:
         if(len(self.input_commitments) != n*(m-1)): return False        
         
         #Sum output commitments
-        neg_total_output_commitment = None
+        neg_total_output_commitment = NullPoint
         for i in range(0, len(self.output_transactions)):
             neg_total_output_commitment = add(neg_total_output_commitment, self.output_transactions[i].c_value)
 
@@ -207,14 +204,9 @@ class RingCT:
             hasher = sha3.keccak_256(msgHash)
 
             #Hash pub keys, values, dhe points, and encrypted data
-            hasher.update(int_to_bytes32(self.output_transactions[i].pub_key[0].n))
-            hasher.update(int_to_bytes32(self.output_transactions[i].pub_key[1].n))
-
-            hasher.update(int_to_bytes32(self.output_transactions[i].c_value[0].n))
-            hasher.update(int_to_bytes32(self.output_transactions[i].c_value[1].n))
-
-            hasher.update(int_to_bytes32(self.output_transactions[i].dhe_point[0].n))
-            hasher.update(int_to_bytes32(self.output_transactions[i].dhe_point[1].n))
+            hasher = add_point_to_hasher(hasher, self.output_transactions[i].pub_key)            
+            hasher = add_point_to_hasher(hasher, self.output_transactions[i].c_value)            
+            hasher = add_point_to_hasher(hasher, self.output_transactions[i].dhe_point)
 
             hasher.update(self.output_transactions[i].pc_encrypted_data.message)
             hasher.update(int_to_bytes32(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)))

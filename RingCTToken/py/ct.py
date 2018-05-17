@@ -109,7 +109,7 @@ class PCRangeProof:
                 point = add(point, subtract)
                 if (not eq(point, self.range_proof.pub_keys[j*L + i])): return False
                         
-        if(self.range_proof.Verify()): return True
+        return self.range_proof.Verify()
 
     def Print(self):
         L = len(self.range_proof.pub_keys) // 4
@@ -123,43 +123,12 @@ class PCRangeProof:
 
     #Prints range proof in a format to be verified on the Ethereum blockchain
     def Print_MEW(self):
-        L = len(self.range_proof.pub_keys)
-        if (L % 4 != 0): return False
-        L = L // 4
-
-        print("Range Proof MEW Representation - for use with CTProvePositive():")
-
-        #Print Total Commitment
-        commitment = self.GetTotalCommitment()
-        
-        print("total_commit:")
-        print(point_to_str(commitment))
-
-        print("\npower_10:")
-        print(str(self.pow10))
-
-        print("\noffset:")
-        print(str(self.offset))
-
-        #Print Bitwise Commitments
-        print("\nbit_commits:")
-        for i in range(0, L-1):
-            print(point_to_str(self.range_proof.pub_keys[i]) + ",")
-
-        print(point_to_str(self.range_proof.pub_keys[L-1]))
-
-        #Print Signature
-        print("\nsignature:")
-        L = len(self.range_proof.signature)
-        for i in range(0, L-1):
-            print(bytes32_to_str(self.range_proof.signature[i]) + ",")
-
-        print(bytes32_to_str(self.range_proof.signature[L-1]))
-
-    def Print_Serialized(self):
         commitment = self.GetTotalCommitment()
         L = len(self.range_proof.pub_keys) // 2
-        
+
+        print()
+        print("Borromean Range Proof MEW Representation - for use with VerifyBorromeanRangeProof():")
+        print("argsSerialized:")
         print(point_to_str(commitment) + ",")
         print(str(self.pow10) + ", " + str(self.offset) + ", ", end = "")
         print(str(L) + ", ", end = "")
@@ -173,6 +142,8 @@ class PCRangeProof:
                 print(",")
                 
             print(hex(self.range_proof.signature[i]), end="")
+
+        print()
         
 class PCAESMessage:
     message = b""
@@ -219,8 +190,8 @@ class PCAESMessage:
         return PCAESMessage(message, iv)
         
     def Print(self):
-        print("Encrypted Message: " + hex(bytes_to_int(self.message)))
-        print("iv: " + hex(bytes_to_int(self.iv)))
+        print("Encrypted Message: " + bytes32_to_str(bytes_to_int(self.message[:32])) + bytes32_to_str(bytes_to_int(self.message[32:]))[30:])
+        print("iv: " + bytes16_to_str(bytes_to_int(self.iv)))
 
 def RangeProofTest(value=48, pow10=18, bits=0, offset=1000000,bf=getRandom()):    
     print("Generating a min " + str(bits) + "-bit Range Proof for " + str(value) + "x(10**" + str(pow10) + ")+" + str(offset) + " = " + str(value*(10**pow10)+offset))

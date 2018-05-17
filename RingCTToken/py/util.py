@@ -69,40 +69,31 @@ def to_point(x, y):
 def bytes32_to_str(b):
     s = hex(b)
 
-    if (len(s) != 66):
+    if (len(s) < 66):
         y = 66 - len(s)
         y = "0" * y
         s = "0x" + y + s[2:]
 
     return s
 
-def print_point(p):
-    if (type(p) == tuple):
-        p = normalize(p)
-        s = hex(p[0].n)
+def bytes20_to_str(b):
+    s = hex(b)
 
-        if (len(s) != 66):
-            y = 66 - len(s)
-            y = "0" * y
-            s = "0x" + y + s[2:]
+    if (len(s) < 42):
+        y = 42 - len(s)
+        y = "0" * y
+        s = "0x" + y + s[2:]
 
-        t = hex(p[1].n)
+    return s
 
-        if (len(t) != 66):
-            y = 66 - len(t)
-            y = "0" * y
-            t = "0x" + y + t[2:]
+def bytes16_to_str(b):
+    s = hex(b)
 
-        s = s + t[2:]
-        
-        
-    else:
-        s = hex(p)
-        if (len(s) != 66):
-            y = 66 - len(s)
-            y = "0" * y
-            s = "0x" + y + s[2:]
-            
+    if (len(s) < 34):
+        y = 34 - len(s)
+        y = "0" * y
+        s = "0x" + y + s[2:]
+
     return s
 
 def point_to_str(p):
@@ -128,6 +119,7 @@ def hash_of_point(p):
     return x
 
 def hash_to_point(p):
+    p = normalize(p)
     hasher = sha3.keccak_256()
     hasher.update(int_to_bytes32(p[0].n))
     hasher.update(int_to_bytes32(p[1].n))
@@ -145,8 +137,17 @@ def hash_to_point(p):
 
     return (FQ(x), FQ(y), FQ(1))
 
+def add_point_to_hasher(hasher, point):
+    point = normalize(point)
+    hasher.update(int_to_bytes32(point[0].n))
+    hasher.update(int_to_bytes32(point[1].n))
+    return hasher
+
 #Definition of H = hash_to_point(G1)
 H = hash_to_point(G1)
+
+def KeyImage(xk):
+    return multiply(hash_to_point(multiply(G1,xk)), xk)
 
 #Utility Functions
 def CompressPoint(Pin):

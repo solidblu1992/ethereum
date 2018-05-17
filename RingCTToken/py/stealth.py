@@ -12,6 +12,12 @@ class StealthTransaction:
         self.pc_encrypted_data = pc_encrypted_data
         self.c_value = c_value
 
+    def isEncrypted(self):
+        if (type(self.c_value) == tuple):
+            return True
+        else:
+            return False
+
     def Generate(pubViewKey, pubSpendKey, value, blinding_factor, r):
         R = multiply(G1, r)
 
@@ -46,21 +52,26 @@ class StealthTransaction:
         return priv_key
         
     def DecryptData(self, privSpendKey):
-        ss = hash_of_point(multiply(self.dhe_point, privSpendKey))
-        return (self.pc_encrypted_data.Decrypt(ss))
+        if (self.isEncrypted()):
+            ss = hash_of_point(multiply(self.dhe_point, privSpendKey))
+            return (self.pc_encrypted_data.Decrypt(ss))
+        else:
+            return(self.c_value, 0)
 
     def Print(self):
         #print("Stealth Transaction:")
         if (type(self.pub_key) == tuple):
-            print("Public Key: " + print_point(CompressPoint(self.pub_key)))
+            print("Public Key: " + bytes32_to_str(CompressPoint(self.pub_key)))
 
         if (type(self.dhe_point) == tuple):
-            print("DHE Point: " + print_point(CompressPoint(self.dhe_point)))
+            print("DHE Point: " + bytes32_to_str(CompressPoint(self.dhe_point)))
 
         if (type(self.c_value) == tuple):
-            print("C_Value: " + print_point(CompressPoint(self.c_value)))
+            print("C_Value: " + bytes32_to_str(CompressPoint(self.c_value)))
+        elif (type(self.c_value) == int):
+            print("Value: " + str(self.c_value))
 
-        if (type(self.pc_encrypted_data) != int):
+        if (type(self.pc_encrypted_data) == PCAESMessage):
             self.pc_encrypted_data.Print()
 
     def PrintScalars(self):

@@ -18,9 +18,9 @@ RingCTTxVerify (https://rinkeby.etherscan.io/address/0xd342405b028efaedc428e6f46
 - Contract which handles the verification of RingCT transactions and Borromean Range Proofs.
 - Using Borromean range proofs is a second option for proving that output pedersen commitments are positive.  In some cases this can be more effecient than Bullet Proofs.  This functionality is mainly utilzed through the RingCTToken contract via VerifyPCBorromeanRangeProof().
 
-- The core RingCT transaction signatures are verified by this contract.  There are two types of RingCT transactions: Send() and Withdraw().  Both are accessible through the RingCTToken contract.
-- Send() allows input UTXO (unspent transaction outputs) to be combined and sent to new destination stealth addresses.  This only deals in RingCT Tokens.
-- Withdraw() allows all the functionality of Send() in addition to allowing a certain portion of tokens to be redeemed for ETH.  This ETH can be redeemed to either a specified receiver or offered up as a bounty for publishing the RingCT transaction.
+- The core RingCT transaction signatures are verified by this contract.
+- Each RingCT transaction allows input UTXOs (unspent transaction outputs) to be combined and sent to new destination stealth addresses. 
+- Optionally a RingCT transaction can choose to reveal a certain portion of tokens and redeem them for ETH.  This ETH can be redeemed to either a specified receiver or offered up as a bounty for publishing the RingCT transaction by publishing a redeem address of "0x0".
 
 - Requires an instance of ECMath, and MLSAGVerify (accessed through calls)
 

@@ -1,6 +1,6 @@
 # RingCT Token
 
-RingCTToken (https://rinkeby.etherscan.io/address/0x94820259a6c590615381b25057fffb3ff086baf0)
+RingCTToken (https://rinkeby.etherscan.io/address/0x8f108aef7baa1e42084653896be6e16ec6623dde)
 - Main Contract for RingCT Token.  All functionality is accessed through this contract.
 - The underlying RingCT protocol aims to create a fungible and private token.  This is accomplished through the combination of linkable ring signatures, output stealth addresses, and confidential transactions.  Ring signatures obfuscate information about the sender, stealth address obfuscate information about the receiver(s), and confidential transactions obfuscate the number of tokens sent.
 - RingCT Tokens are backed and redeemable 1:1 for ETH.

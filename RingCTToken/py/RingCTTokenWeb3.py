@@ -19,7 +19,7 @@ web3.middleware_stack.inject(geth_poa_middleware, layer=0)
 # Get RingCT Token Contract #
 #############################
 print("Initializing RingCT Token Contract")
-contract_addr = "0x94820259A6C590615381b25057fFfB3Ff086BAF0";
+contract_addr = "0x8F108AEf7bAA1E42084653896bE6E16eC6623dDe";
 contract_abi = open("RingCTToken.json").read()
 contract = web3.eth.contract(address=contract_addr,
                              abi=contract_abi,
@@ -178,7 +178,9 @@ for i in range(0, len(entries)):
                 print("[spent:         " + str(spent) + "]")
             print()
 
-#Export UTXO Pool and Mixin Pool to file
+###########################################
+# Export UTXO Pool and Mixin Pool to file #
+###########################################
 print("Import complete, writing to csv file")
 with open("utxo.csv", "w") as file:
     writer = csv.writer(file, delimiter=",")
@@ -225,11 +227,19 @@ with open("utxo.csv", "w") as file:
 
     file.close()
 
-#Get Token Balance
+#####################
+# Get Token Balance #
+#####################
 balance = rct.GetBalance()
 print("Token Balance: " + str(balance / 10**18) + " ETH (" + str(balance) + " wei)")
 
 #Generate Transactions
+#Deposit
+if (False):
+    deposit_count = 16
+    deposit_value = 10**16
+    rct.Deposit([deposit_value]*deposit_count)
+    
 #Spend
 if (False):
     StealthAddress2 = [0x4c9533a55063b232b3e5d7381ba19238048e1372f3c75c4cc958d9d3b122e, 0x243a70b7099a51906eeba778a1b1c16f2c3c0e092df326cd4148f8c5c86153ee]
@@ -239,5 +249,5 @@ if (False):
     tx = rct.Send(dest_rct.MyPublicViewKey, dest_rct.MyPublicSpendKey, 10**15, mixin_count=3)
 
 #Withdraw
-if (False):
+if (True):
     tx = rct.Withdraw(EthAddress, 9000000000000000, mixin_count=3)

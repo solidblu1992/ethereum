@@ -689,16 +689,16 @@ def BulletProofTest4():
     return bp
 
 #Single Bullet Proofs
-if (False):
-    print("Generating Single Bullet Proofs...")
-    bp = BulletProof.Generate(5, 17, 0, N=4)
+if (True):
+    print("Generating Single Bullet Proof(s)...")
+    bp = BulletProof.Generate(0, 0, 0, N=32)
     #bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=4)
     #bp = BulletProof.Generate([5]*4, [17]*4, [0]*4, N=4)
     #bp = BulletProof.Generate([5]*8, [17]*8, [0]*8, N=4)
     bp.Print_MEW()
 
 #Multiple Bullet Proofs
-if (True):
+if (False):
     print("Generating Multiple Bullet Proofs...")
     p = 2 #Number of Proofs
     m = 2 #Commitments per Proof

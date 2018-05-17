@@ -240,10 +240,10 @@ class RingCT:
             print("Key Vector " + str(j+1))
             
             for i in range(0, self.input_count+1):
-                print(print_point(CompressPoint(self.mlsag.pub_keys[j*(self.input_count+1)+i])), end="")
+                print(bytes_to_str(CompressPoint(self.mlsag.pub_keys[j*(self.input_count+1)+i])), end="")
 
                 if (i < self.input_count):
-                    print(", " + print_point(CompressPoint(self.input_commitments[j*(self.input_count) + i])))
+                    print(", " + bytes_to_str(CompressPoint(self.input_commitments[j*(self.input_count) + i])))
                 else:
                     print()
 
@@ -251,7 +251,7 @@ class RingCT:
         print("Outputs (PubKeyK, C_Value_OutK)")
         for i in range(0, len(self.output_transactions)):
             print("Output " + str(i+1))
-            print(print_point(CompressPoint(self.output_transactions[i].pub_key)) + ", " + print_point(CompressPoint(self.output_transactions[i].c_value)))
+            print(bytes_to_str(CompressPoint(self.output_transactions[i].pub_key)) + ", " + bytes_to_str(CompressPoint(self.output_transactions[i].c_value)))
 
         if (self.redeem_eth_value > 0):
             print("-----")
@@ -261,81 +261,46 @@ class RingCT:
     def Print_MEW(self):
         output_count = len(self.output_transactions)
 
-        #Print Withdrawal information if applicable
-        if (self.redeem_eth_value > 0):
-            print("Ring CT MEW Representation - for use with Withdraw():")
-            print("redeem_eth_address:")
-            print(hex(self.redeem_eth_address))
-                
-            print("\nredeem_eth_value:")
-            print(str(self.redeem_eth_value))
-        else:
-            print("Ring CT Remix Representation - for use with Send():")
-        
-        #Print destination public keys
-        print("\ndest_pub_keys:")
-        for i in range(0, output_count):
-            print(point_to_str(self.output_transactions[i].pub_key), end = "")
+        print("Ring CT MEW Representation - for use with Send():")
+        print("argsSerialized:")
 
-            if (i < (output_count-1)):
-                print(",")
+        #Print redeem eth parameters (will both be 0 in non-withdrawal tx)
+        print(hex(self.redeem_eth_address) + ",")
+        print(str(self.redeem_eth_value) + ",")
 
-        #Print destination committed values
-        print("\n\nvalues:")
-        for i in range(0, output_count):
-            print(point_to_str(self.output_transactions[i].c_value), end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-
-        #Print destination DHE Points
-        print("\n\ndest_dhe_points:")
-        for i in range(0, output_count):
-            print(point_to_str(self.output_transactions[i].dhe_point), end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-
-        #Print encrypted data
-        print("\n\nencrypted_data:")
-        for i in range(0, output_count):
-            print(bytes32_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + ",")
-            print(bytes32_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + ",")
-            print(bytes32_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)), end = "")
-
-            if (i < (output_count-1)):
-                print(",")
-
-        #Print public keys (except last column - calculated by contract)
+        #Print array lengths
         m = len(self.mlsag.key_images)
         assert(len(self.mlsag.pub_keys) % m == 0)
         n = len(self.mlsag.pub_keys) // m
-        print("\n\ninput_pub_keys:")
+        
+        print(str(n*(m-1)) + ", ", end="")
+        print(str(len(self.output_transactions)) + ", ", end="")
+        print(str(len(self.mlsag.key_images)*2) + ", ", end="")
+        print(str(len(self.mlsag.signature)) + ",")
+
+        #Print input utxos (public key only, committed values will be supplied by the contract)
         for j in range(0, n):
-            for i in range(0, m-1):
-                print(point_to_str(self.mlsag.pub_keys[j*m+i]), end = "")
+            for i in range(0, m-1):                    
+                print(point_to_str(self.mlsag.pub_keys[j*m+i]) + ",")
+        
+        #Print output utxos (public key, dhe_point, committed value, and encrypted data)
+        for i in range(0, len(self.output_transactions)):
+            print(point_to_str(self.output_transactions[i].pub_key) + ",")
+            print(point_to_str(self.output_transactions[i].c_value) + ",")
+            print(point_to_str(self.output_transactions[i].dhe_point) + ",")
+            print(bytes_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32])) + ",")
+            print(bytes_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:])) + ",")
+            print(bytes_to_str(bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)) + ",")
 
-                if (i < (m-2)):
-                    print(",")
-
-            if (j < (n-1)):
-                print(",")
-
-        #Print key images (all of them)
-        print("\n\nI:")
+        #Print key images
         for i in range(0, m):
-            print(point_to_str(self.mlsag.key_images[i]), end = "")
-
-            if (i < (m-1)):
-                print(",")
+            print(point_to_str(self.mlsag.key_images[i]) + ",")
 
         #Print signature (c1, s1, s2, ... snm)
-        L = len(self.mlsag.signature)
-        print("\n\nsignature:")
-        for i in range(0, L-1):
-            print(bytes32_to_str(self.mlsag.signature[i]) + ",")
-
-        print(bytes32_to_str(self.mlsag.signature[L-1]))
+        for i in range(0, len(self.mlsag.signature)):
+            if (i > 0):
+                print(",")
+            print(bytes_to_str(self.mlsag.signature[i]), end="")
 
 def RingCTTest(input_count = 2, mixin_count = 3, outputs = 2, rngSeed=0):
     import random

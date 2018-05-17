@@ -292,9 +292,9 @@ class RingCTToken:
         print("total output value: " + str(total_out_value))
 
         #Print PC Range Proof Data
-        print("============================================")
-        print("PC Range Proof Data")
-        print("============================================")
+        print("===================================================================")
+        print("Borromean Range Proof Data")
+        print("===================================================================")
 
         for i in range(0, len(output_values)):
             print("--------------------------------------------")
@@ -304,9 +304,9 @@ class RingCTToken:
             out_rp[i].Print_MEW()
         
         #Print Send Data
-        print("============================================")
+        print("===================================================================")
         print("Send Tx Data")
-        print("============================================")
+        print("===================================================================")
         sig.Print_MEW()
         return (out_rp, sig)
 
@@ -407,9 +407,9 @@ class RingCTToken:
         print("total output value: " + str(total_out_value+redeem_eth_value))
 
         #Print PC Range Proof Data
-        print("============================================")
-        print("PC Range Proof Data")
-        print("============================================")
+        print("===================================================================")
+        print("Borromean Range Proof Data")
+        print("===================================================================")
 
         for i in range(0, len(output_values)):
             print("--------------------------------------------")
@@ -419,19 +419,63 @@ class RingCTToken:
             out_rp[i].Print_MEW()
         
         #Print Send Data
-        print("============================================")
-        print("Withdraw Tx Data")
-        print("============================================")
+        print("===================================================================")
+        print("Send Tx Data")
+        print("===================================================================")
         sig.Print_MEW()
         return (out_rp, sig)
 
-    #High level functions
+    ########################
+    # High level functions #
+    ########################
     def GetBalance(self):
         token_balance = 0
         for i in range(len(self.MyUTXOPool)):
             token_balance += self.MyUTXOPool[i].DecryptData(self.MyPrivateSpendKey)[0]
 
         return token_balance
+
+    def Deposit(self, values):
+        if (type(values) != list):
+            values = [values]
+
+        total_value = 0
+        for i in range(0, len(values)):
+            total_value += values[i]
+
+        #Generate Deposit UTXOs
+        utxo_start_index = len(self.MyPendingUTXOPool)
+        self.GeneratePendingUTXOs(values, [0]*len(values))
+        
+        #Print Deposit Data
+        print("===================================================================")
+        print("Deposit Data")
+        print("===================================================================")
+        print("--------------------------------------------")
+        print("Total Value: " + str(total_value / 10**18) + " ETH (" + str(total_value) + " wei)")
+        print("--------------------------------------------")
+        print()
+        print("dest_pub_keys:")
+        for i in range(utxo_start_index, len(self.MyPendingUTXOPool)):
+            if (i > 0):
+                print(",")
+
+            print(bytes_to_str(CompressPoint(self.MyPendingUTXOPool[i].pub_key)), end = "")
+
+        print("\n\ndhe_points:")
+        for i in range(utxo_start_index, len(self.MyPendingUTXOPool)):
+            if (i > 0):
+                print(",")
+            
+            print(bytes_to_str(CompressPoint(self.MyPendingUTXOPool[i].dhe_point)), end = "")
+
+        print("\n\nvalues:")
+        for i in range(utxo_start_index, len(self.MyPendingUTXOPool)):
+            if (i > 0):
+                print(",")
+            
+            print(str(self.MyPendingUTXOPool[i].DecryptData(self.MyPrivateSpendKey)[0]), end = "")
+            
 
     def Send(self, dest_pub_view_key, dest_pub_spend_key, value, mixin_count=3):
         balance = self.GetBalance()
@@ -494,9 +538,7 @@ class RingCTToken:
 
         #Generate Send Transaction
         tx = self.GenerateWithdrawTx(redeem_eth_address, value, utxo_indices, mixin_count, [utxo_remainder], [self.MyPublicViewKey], [self.MyPublicSpendKey])
-        return tx
-
-        
+        return tx        
 
     #Print Functions
     def PrintStealthAddress(self):

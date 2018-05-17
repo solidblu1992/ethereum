@@ -82,7 +82,7 @@ def point_to_str(p):
 
     p = normalize(p)
     
-    s = (bytes32_to_str(p[0].n) + ",\n" + bytes32_to_str(p[1].n))
+    s = (bytes_to_str(p[0].n) + ",\n" + bytes_to_str(p[1].n))
     return s
 
 def hash_of_int(i):

@@ -41,16 +41,36 @@ library RingCTTxStruct {
 		if (length > 0) args.signature = new uint256[](length);
 		
 		//Check input length again
-		require(argsSerialized.length >= (6 + args.input_tx.length*4 + args.output_tx.length*9 + args.I.length + args.signature.length));
-		
-		//Assemble the rest of args
+		//In the first case, all args are provided explicitly
+		length = 6 + args.input_tx.length*4 + args.output_tx.length*9 + args.I.length + args.signature.length;
 		index = 6;
-		for (i = 0; i < args.input_tx.length; i++) {
-			args.input_tx[i].pub_key = [argsSerialized[index], argsSerialized[index+1]];
-			args.input_tx[i].value = [argsSerialized[index+2], argsSerialized[index+3]];
-			index = index + 4;
+		if (argsSerialized.length >= length) {
+			//Assemble the rest of args
+			for (i = 0; i < args.input_tx.length; i++) {
+				args.input_tx[i].pub_key = [argsSerialized[index], argsSerialized[index+1]];
+				args.input_tx[i].value = [argsSerialized[index+2], argsSerialized[index+3]];
+				index = index + 4;
+			}
 		}
-
+		else {
+			//In the 2nd case, input_tx values are implicit.  This makes sense, because usually these will be supplied by the contract
+			//Subtract of 2 for each args.input_tx.value[i]
+			length -= args.input_tx.length*2;
+			if (argsSerialized.length >= length) {
+				//Assemble the rest of args (with implicit args.input_tx.value[i])
+				index = 6;
+				for (i = 0; i < args.input_tx.length; i++) {
+					args.input_tx[i].pub_key = [argsSerialized[index], argsSerialized[index+1]];
+					//No check for args.input_tx.value[i]
+					index = index + 2;
+				}
+			}
+			else {
+				revert(); //Not enough arguments
+			}
+		}
+		
+		//In either case, all other arguments must be supplied explicitly
 		for (i = 0; i < args.output_tx.length; i++) {
 			args.output_tx[i].pub_key = [argsSerialized[index], argsSerialized[index+1]];
 			args.output_tx[i].value = [argsSerialized[index+2], argsSerialized[index+3]];

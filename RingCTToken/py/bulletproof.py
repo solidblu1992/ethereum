@@ -679,11 +679,10 @@ def BulletProofTest4():
 
 #Single Bullet Proofs
 if (True):
+    N = 64   #bits
+    m = 2    #commitments per proof
     print("Generating Single Bullet Proof(s)...")
-    bp = BulletProof.Generate(0, 17, 0, N=32)
-    #bp = BulletProof.Generate([5]*2, [17]*2, [0]*2, N=4)
-    #bp = BulletProof.Generate([5]*4, [17]*4, [0]*4, N=4)
-    #bp = BulletProof.Generate([5]*8, [17]*8, [0]*8, N=4)
+    bp = BulletProof.Generate([0]*m, [0]*m, [0]*m, getRandom(m), N)
     bp.Print_MEW()
 
 #Multiple Bullet Proofs
@@ -691,7 +690,7 @@ if (False):
     print("Generating Multiple Bullet Proofs...")
     p = 2 #Number of Proofs
     m = 2 #Commitments per Proof
-    bits = 16
+    bits = 32
     bp = [None]*p
     for i in range(0, p):
         bp[i] = BulletProof.Generate([5]*m, [17]*m, [0]*m, N=bits)

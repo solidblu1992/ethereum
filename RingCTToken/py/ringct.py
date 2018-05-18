@@ -232,6 +232,47 @@ class RingCT:
         #Verify signature
         return self.mlsag.Verify()
 
+    def Serialize(self):
+        out = [self.redeem_eth_address, self.redeem_eth_value]
+
+        m = len(self.mlsag.key_images)
+        assert(len(self.mlsag.pub_keys) % m == 0)
+        n = len(self.mlsag.pub_keys) // m
+
+        out += [n*(m-1), len(self.output_transactions), len(self.mlsag.key_images)*2, len(self.mlsag.signature)]
+
+        #Print input utxos (public key only, committed values will be supplied by the contract)
+        for j in range(0, n):
+            for i in range(0, m-1):
+                point = normalize(self.mlsag.pub_keys[j*m+i])
+                out += [point[0], point[1]]
+        
+        #Print output utxos (public key, dhe_point, committed value, and encrypted data)
+        for i in range(0, len(self.output_transactions)):
+            point = normalize(self.output_transactions[i].pub_key)
+            out += [point[0], point[1]]
+
+            point = normalize(self.output_transactions[i].c_value)
+            out += [point[0], point[1]]
+
+            point = normalize(self.output_transactions[i].dhe_point)
+            out += [point[0], point[1]]
+
+            out += [bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[:32]),
+                    bytes_to_int(self.output_transactions[i].pc_encrypted_data.message[32:]),
+                    bytes_to_int(self.output_transactions[i].pc_encrypted_data.iv)]
+
+        #Print key images
+        for i in range(0, m):
+            point = normalize(self.mlsag.key_images[i])
+            out += [point[0], point[1]]
+
+        #Print signature (c1, s1, s2, ... snm)
+        for i in range(0, len(self.mlsag.signature)):
+            out += [self.mlsag.signature[i]]
+
+        return tuple(out)
+
     def Print(self):
         print("Ring CT Transaction")
         print("Inputs (PubKey1, C_Value1), ..., (PubKeyM, C_ValueM), {sum(PubKey1...M-1) + sum(C_Value1...M-1) - sum(C_Value_Out)}:")

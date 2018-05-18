@@ -1,5 +1,4 @@
 #Imports
-from RingCTTokenTest import *
 import json
 from web3 import Web3, HTTPProvider
 from web3.contract import Contract
@@ -7,6 +6,7 @@ from web3.contract import Contract
 from web3 import Web3, HTTPProvider, TestRPCProvider
 from web3.middleware import geth_poa_middleware
 import csv
+from RingCTToken import *
 
 ##############
 # Fetch Web3 #
@@ -241,13 +241,15 @@ if (False):
     rct.Deposit([deposit_value]*deposit_count)
     
 #Spend
-if (False):
+if (True):
     StealthAddress2 = [0x4c9533a55063b232b3e5d7381ba19238048e1372f3c75c4cc958d9d3b122e, 0x243a70b7099a51906eeba778a1b1c16f2c3c0e092df326cd4148f8c5c86153ee]
     dest_rct = RingCTToken()
     dest_rct.SetStealthAddress(StealthAddress2[0], StealthAddress2[1])
     
     tx = rct.Send(dest_rct.MyPublicViewKey, dest_rct.MyPublicSpendKey, 10**15, mixin_count=3)
 
+    x = web3.IPCProviderweb3.eth.abi.encodeParameter("uint256[]", tx[1].Serialize())
+
 #Withdraw
-if (True):
+if (False):
     tx = rct.Withdraw(EthAddress, 9000000000000000, mixin_count=3)

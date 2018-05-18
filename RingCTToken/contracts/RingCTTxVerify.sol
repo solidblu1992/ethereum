@@ -189,23 +189,10 @@ contract RingCTTxVerify is ECMathInterface, MLSAGVerifyInterface {
         }
     }
 	
-	function HashSendMsg(uint256[] output_pub_keys, uint256[] output_values, uint256[] output_dhe_points, uint256[] output_encrypted_data)
-		public pure returns (uint256 msgHash)
-	{
-		return HashSendMsg(UTXO.CreateOutputArray(output_pub_keys, output_values, output_dhe_points, output_encrypted_data));
-	}		
-	
 	function HashWithdrawMsg(address ethAddress, uint256 value, UTXO.Output[] output_tx)
 		internal pure returns (uint256 msgHash)
 	{
         msgHash = HashSendMsg(output_tx);
         msgHash = uint256(keccak256(msgHash, ethAddress, value));
 	}
-	
-	function HashWithdrawMsg(address ethAddress, uint256 value,
-										uint256[] output_pub_keys, uint256[] output_values, uint256[] output_dhe_points, uint256[] output_encrypted_data)
-		public pure returns (uint256 msgHash)
-	{
-		return HashWithdrawMsg(ethAddress, value, UTXO.CreateOutputArray(output_pub_keys, output_values, output_dhe_points, output_encrypted_data));
-	}	
 }

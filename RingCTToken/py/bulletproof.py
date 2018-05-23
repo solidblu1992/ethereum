@@ -583,38 +583,48 @@ class BulletProof:
 #Single Bullet Proofs
 if (True):
     N = 32   #bits
-    m = 1    #commitments per proof
-    print("Generating Single Bullet Proof(s)...")
+    m = 2    #commitments per proof
+    print("Generating Single Bullet Proof with " + str(m) + " commitment(s) of " + str(N) + " bits...")
 
+    #Generate proof(s)
     import time
     t = time.time()
-    
     bp = BulletProof.Generate([0]*m, [0]*m, [0]*m, getRandom(m), N)
-
     t = time.time() - t
-    
     bp.Print_MEW()
-
     print()
-    print("Total time: " + str(t) + "s")
+    print("Generate time: " + str(t / m) + "s")
+
+    #Verify proofs(s)
+    t = time.time()
+    bp.Verify()
+    t = time.time() - t
+    print("Verify time: " + str(t / m) + "s")
+    print()
 
 #Multiple Bullet Proofs
 if (False):
-    print("Generating Multiple Bullet Proofs...")
     p = 2 #Number of Proofs
     m = 2 #Commitments per Proof
     bits = 32
     bp = [None]*p
-    
+
+    print("Generating " + str(p) + " Bullet Proof(s) each with " + str(m) + " commitment(s) of " + str(bits) + " bits...")
+
+    #Generate Proof(s)
     import time
     t = time.time()
-    
     for i in range(0, p):
         bp[i] = BulletProof.Generate([5]*m, [17]*m, [0]*m, N=bits)
-
     t = time.time() - t
-
     BulletProof.PrintMultiMEW(bp)
-
     print()
-    print("Total time: " + str(t) + "s")
+    print("Generation time: " + str(t) + "s (" + str(t / (p * m)) + "s per commitment)")
+
+    #Verify proofs(s)
+    t = time.time()
+    BulletProof.VerifyMulti(bp)
+    t = time.time() - t
+    print("Verify time: " + str(t) + "s (" + str(t / (p * m)) + "s per commitment)")
+    print()
+    

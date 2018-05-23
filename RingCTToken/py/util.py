@@ -9,9 +9,9 @@ ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000
 NullPoint = (FQ(0), FQ(0), FQ(0))
 
 useShamir = True    #Flag True to use Shamir's Trick to compute (a*A + b*B) effectively
+useWindowed = True  #Flag True to use windowed EC Multiplication
 
 #Windowed Elliptic Curve Multiplication Parameters
-useWindowed = True  #Flag True to use windowed EC Multiplication
 wBits = 5
 wPow = 2**wBits
 wPowOver2 = wPow // 2
@@ -300,7 +300,7 @@ else:
         if s == 0:
             return (P[0].__class__.one(), P[0].__class__.one(), P[0].__class__.zero())
         elif s == 1:
-            return pt
+            return P
         elif not s % 2:
             return multiply(double(P), s // 2)
         else:
@@ -318,7 +318,7 @@ if (useShamir):
     def shamir2(P, s):        
         assert(len(P) == 2)
         assert(len(P) == len(s))
-        points = P + [add(P[0], P[1])]
+        points = P + [add(P[0], P[1])]  #A, B, (A+B)
         
         x = find_msb(max(s))
         Pout = NullPoint
@@ -326,109 +326,126 @@ if (useShamir):
         while (x > 0):
             Pout = double(Pout)
 
-            if (not eq(Pout, NullPoint)):
-                print("Double")
-            
+            i = 0
             if ((x & s[0]) > 0):
-                if ((x & s[1]) > 0):
-                    Pout = add(Pout, points[2]) #A, B
-                else:
-                    Pout = add(Pout, points[0]) #A
-            elif ((x & s[1]) > 0):
-                Pout = add(Pout, points[1])     #B
+                i += 1
+
+            if ((x & s[1]) > 0):
+                i += 2
+
+            if (i > 0):
+                Pout = add(Pout, points[i-1])
                     
             x = x >> 1
 
         return Pout
 
-    def shamir3(P, s):        
-        assert(len(P) == 3)
-        assert(len(P) == len(s))
-        
-        points = P + [NullPoint]*4              #A, B, C
-        points[3] = add(points[0], points[1])   #A + B
-        points[4] = add(points[0], points[2])   #A + C
-        points[5] = add(points[1], points[2])   #B + C
-        points[6] = add(points[3], points[2])   #(A + B) + C
-        
+    def shamir(P, s):
+        b = len(P)
+        assert(b == len(s))
+
+        if (b == 1):
+            return multiply(P[0], s[0])
+
+        points = [NullPoint]*(2**b-1)
+
+        bit = 1
+        for i in range(0, b):
+            for j in range(1, len(points)+1):
+                if ((j & bit) > 0):
+                    points[j-1] = add(points[j-1], P[i])
+
+            bit = bit << 1
+
         x = find_msb(max(s))
         Pout = NullPoint
 
         while (x > 0):
             Pout = double(Pout)
 
-            if ((x & s[0]) > 0):
-                if ((x & s[1]) > 0):
-                    if ((x & s[2]) > 0):
-                        Pout = add(Pout, points[6])     #A + B + C
-                    else:
-                        Pout = add(Pout, points[3])     #A + B
-                else:
-                    if ((x & s[2]) > 0):
-                        Pout = add(Pout, points[4])     #A + C
-                    else:
-                        Pout = add(Pout, points[0])     #A
-            else:
-                if ((x & s[1]) > 0):
-                    if ((x & s[2]) > 0):
-                        Pout = add(Pout, points[5])     #B + C
-                    else:
-                        Pout = add(Pout, points[1])     #B
-                elif ((x & s[2]) > 0):
-                        Pout = add(Pout, points[2])     #C
-                        
+            i = 0
+            bit = 1
+            for j in range(0, b):
+                if ((x & s[j]) > 0):
+                    i = i + bit
+
+                bit = bit << 1
+
+            if (i > 0):
+                Pout = add(Pout, points[i-1])
+                    
             x = x >> 1
 
         return Pout
+
+    def Shamir2_TimeTrials(N=100):
+        import time
+
+        #Pick random numbers
+        r1 = getRandom(N)
+        r2 = getRandom(N)
+
+        ms = time.time()
+        for i in range(0, len(r1)):
+            P = add(multiply(G1, r1[i]), multiply(H, r2[i]))
+        ms_end = time.time()
+        t0 = ms_end-ms
+        print("multiply() => " + str(t0) + "s")
+
+        ms = time.time()
+        for i in range(0, len(r)):
+            P = shamir2(G1, r1[i], H, r2[i])
+        ms_end = time.time()
+        t1 = ms_end-ms
+        print("shamir2() => " + str(t1) + "s")
+        print("% => " + str((t0-t1)*100/t0))
+
+    def Shamir_TimeTrials(N=100, n=4):
+        import time
+
+        #Pick random Numbers
+        r = []
+        for i in range(0, N):
+            r = r + [getRandom(n)]
+
+        #Get generator points
+        G = [G1] + [NullPoint]*(n-1)
+        for j in range(1, n):
+                G[j] = hash_to_point(G[j-1])
+
+        #Test naive method
+        ms = time.time()
+        for i in range(0, N):
+            P = multiply(G[0], r[i][0])
+            for j in range(1, n):
+                P = add(P, multiply(G[j], r[i][j]))
+                
+        ms_end = time.time()
+        t0 = ms_end-ms
+        print("multiply() => " + str(t0) + "s")
+
+        #Test Shamir's trick
+        ms = time.time()
+        for i in range(0, N):
+            P = shamir(G, r[i])
+        ms_end = time.time()
+        t1 = ms_end-ms
+        print("shamir3() => " + str(t1) + "s")
+        print("% => " + str((t0-t1)*100/t0))
 else:
     def shamir2(P, s):
         assert(len(P) == 2)
         assert(len(P) == len(s))
         return add(multiply(P[0], s[0]), multiply(P[1], s[1]))
 
-    def shamir3(P, s):
-        assert(len(P) == 3)
+    def shamir(P, s):
+        if (len(P) == 1):
+            return multiply(P[0], s[0])
+        
         assert(len(P) == len(s))
-        return add(add(multiply(P[0], s[0]), multiply(P[1], s[1])), multiply(P[2], s[2]))
 
-def Shamir2_TimeTrials(N=100):
-    import time
-    ms = time.time()
-    r1 = getRandom(N)
-    r2 = getRandom(N)
-    for i in range(0, len(r1)):
-        P = add(multiply(G1, r1[i]), multiply(H, r2[i]))
-    ms_end = time.time()
-    t0 = ms_end-ms
-    print("multiply() => " + str(t0) + "s")
-
-    ms = time.time()
-    r = getRandom(N)
-    for i in range(0, len(r)):
-        P = shamir2(G1, r1[i], H, r2[i])
-    ms_end = time.time()
-    t1 = ms_end-ms
-    print("shamir2() => " + str(t1) + "s")
-    print("% => " + str((t0-t1)*100/t0))
-
-def Shamir3_TimeTrials(N=100):
-    import time
-    ms = time.time()
-    r1 = getRandom(N)
-    r2 = getRandom(N)
-    r3 = getRandom(N)
-    I = hash_to_point(H)
-    for i in range(0, len(r1)):
-        P = add(add(multiply(G1, r1[i]), multiply(H, r2[i])), multiply(I, r3[i]))
-    ms_end = time.time()
-    t0 = ms_end-ms
-    print("multiply() => " + str(t0) + "s")
-
-    ms = time.time()
-    r = getRandom(N)
-    for i in range(0, len(r)):
-        P = shamir3([G1, H, I], [r1[i], r2[i], r3[i]])
-    ms_end = time.time()
-    t1 = ms_end-ms
-    print("shamir3() => " + str(t1) + "s")
-    print("% => " + str((t0-t1)*100/t0))
+        Pout = multiply(P[0], s[0])
+        for i in range(1, len(P)):
+            Pout = add(Pout, multiply(P[i], s[i]))
+            
+        return Pout

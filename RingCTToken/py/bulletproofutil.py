@@ -3,6 +3,8 @@ from ring_signatures import *
 
 Gi = []
 Hi = []
+pvExpShamirSize = 3     #When using Shamir's trick, perform multi exponentiation in batches of 2*pvExpShamirSize
+
 def GenBasePoints(N, Gi_old=None, Hi_old=None):
     #Get curve Generator Points    
     if (Gi_old != None) and (Hi_old != None):
@@ -169,9 +171,16 @@ if (useShamir):
         assert(len(B) >= len(b))
 
         out = NullPoint
-        for i in range(0, len(a)):
-            out = add(out, shamir2([A[i], B[i]], [a[i], b[i]]))
 
+        #Use shamir in batches of 2*pvExpShamirSize points,
+        #Then do batch of remainder
+        for i in range(0, len(a), pvExpShamirSize):
+            ip = i+pvExpShamirSize
+            if (ip > len(a)):
+                ip = len(a)
+                
+            out = add(out, shamir(A[i:ip] + B[i:ip], a[i:ip] + b[i:ip]))
+    
         return out
 
     def pvExp(a, b):

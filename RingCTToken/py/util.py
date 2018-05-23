@@ -7,6 +7,7 @@ Ncurve = curve_order
 Pcurve = 0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47
 ECSignMask = 0x8000000000000000000000000000000000000000000000000000000000000000
 NullPoint = (FQ(0), FQ(0), FQ(0))
+counters = [0]*32
 
 useShamir = True    #Flag True to use Shamir's Trick to compute (a*A + b*B) effectively
 useWindowed = True  #Flag True to use windowed EC Multiplication
@@ -280,31 +281,32 @@ if (useWindowed):
             
         return Q
 
-    def TimeTrial_MultiplyWindowed(N=100):
+    def Multiply_TimeTrials(N=300):
         import time
-        ms = time.time()
         r = getRandom(N)
+        t0 = time.time()
+        for i in range(0, len(r)):
+            P = multiply_naive(G1, r[i])
+        t0 = time.time() - t0
+        print("naive() => " + str(t0) + "s")
+
+        t1 = time.time()
         for i in range(0, len(r)):
             P = multiply(G1, r[i])
-        ms_end = time.time()
-        print("multiply() => " + str(ms_end-ms) + "s")
+        t1 = time.time() - t1
+        print("windowed_pre() => " + str(t1) + "s")
+        print("% => " + str((t0-t1)*100/t1))
 
-        ms = time.time()
-        r = getRandom(N)
+        Gi = hash_to_point(H)
+        t2 = time.time()
         for i in range(0, len(r)):
-            P = multiply_windowed(G1, r[i])
-        ms_end = time.time()
-        print("multiply_windowed() => " + str(ms_end-ms) + "s")
+            P = multiply(Gi, r[i])
+        t2 = time.time() - t2
+        print("windowed() => " + str(t2) + "s")
+        print("% => " + str((t0-t2)*100/t2))
 else:
     def multiply(P, s):
-        if s == 0:
-            return (P[0].__class__.one(), P[0].__class__.one(), P[0].__class__.zero())
-        elif s == 1:
-            return P
-        elif not s % 2:
-            return multiply(double(P), s // 2)
-        else:
-            return add(multiply(double(P), int(s // 2)), P)
+        return multiply_naive(P, s)
 
 #shamir2 and shamir 3 are variations on multiply() using Shamir's Trick - Multiexponentiation
 def find_msb(s):
@@ -315,31 +317,6 @@ def find_msb(s):
     return x
 
 if (useShamir):
-    def shamir2(P, s):        
-        assert(len(P) == 2)
-        assert(len(P) == len(s))
-        points = P + [add(P[0], P[1])]  #A, B, (A+B)
-        
-        x = find_msb(max(s))
-        Pout = NullPoint
-
-        while (x > 0):
-            Pout = double(Pout)
-
-            i = 0
-            if ((x & s[0]) > 0):
-                i += 1
-
-            if ((x & s[1]) > 0):
-                i += 2
-
-            if (i > 0):
-                Pout = add(Pout, points[i-1])
-                    
-            x = x >> 1
-
-        return Pout
-
     def shamir(P, s):
         b = len(P)
         assert(b == len(s))
@@ -378,29 +355,7 @@ if (useShamir):
 
         return Pout
 
-    def Shamir2_TimeTrials(N=100):
-        import time
-
-        #Pick random numbers
-        r1 = getRandom(N)
-        r2 = getRandom(N)
-
-        ms = time.time()
-        for i in range(0, len(r1)):
-            P = add(multiply(G1, r1[i]), multiply(H, r2[i]))
-        ms_end = time.time()
-        t0 = ms_end-ms
-        print("multiply() => " + str(t0) + "s")
-
-        ms = time.time()
-        for i in range(0, len(r)):
-            P = shamir2(G1, r1[i], H, r2[i])
-        ms_end = time.time()
-        t1 = ms_end-ms
-        print("shamir2() => " + str(t1) + "s")
-        print("% => " + str((t0-t1)*100/t0))
-
-    def Shamir_TimeTrials(N=100, n=4):
+    def Shamir_TimeTrials(N=100, n=2):
         import time
 
         #Pick random Numbers
@@ -422,7 +377,7 @@ if (useShamir):
                 
         ms_end = time.time()
         t0 = ms_end-ms
-        print("multiply() => " + str(t0) + "s")
+        print("naive() => " + str(t0) + "s")
 
         #Test Shamir's trick
         ms = time.time()
@@ -430,14 +385,9 @@ if (useShamir):
             P = shamir(G, r[i])
         ms_end = time.time()
         t1 = ms_end-ms
-        print("shamir3() => " + str(t1) + "s")
+        print("shamir() => " + str(t1) + "s")
         print("% => " + str((t0-t1)*100/t0))
 else:
-    def shamir2(P, s):
-        assert(len(P) == 2)
-        assert(len(P) == len(s))
-        return add(multiply(P[0], s[0]), multiply(P[1], s[1]))
-
     def shamir(P, s):
         if (len(P) == 1):
             return multiply(P[0], s[0])

@@ -98,15 +98,15 @@ def add(p1, p2):
 
 
 # Elliptic curve point multiplication
-def multiply(pt, n):
+def multiply_naive(pt, n):
     if n == 0:
         return (pt[0].__class__.one(), pt[0].__class__.one(), pt[0].__class__.zero())
     elif n == 1:
         return pt
     elif not n % 2:
-        return multiply(double(pt), n // 2)
+        return multiply_naive(double(pt), n // 2)
     else:
-        return add(multiply(double(pt), int(n // 2)), pt)
+        return add(multiply_naive(double(pt), int(n // 2)), pt)
 
 
 def eq(p1, p2):

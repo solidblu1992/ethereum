@@ -102,7 +102,7 @@ class BulletProof:
             if (v[i] == 0):
                 V[i] = multiply(G1, gamma[i])
             else:
-                V[i] = shamir2([G1, H], [gamma[i], v[i]])
+                V[i] = shamir([G1, H], [gamma[i], v[i]])
 
         #Create A
         aL = [0]*(M*N)
@@ -167,8 +167,8 @@ class BulletProof:
 
         tau1 = getRandom()
         tau2 = getRandom()
-        T1 = shamir2([G1, H], [tau1, t1])
-        T2 = shamir2([G1, H], [tau2, t2])
+        T1 = shamir([G1, H], [tau1, t1])
+        T2 = shamir([G1, H], [tau2, t2])
 
         #Continue Fiat-Shamir
         hasher = add_point_to_hasher(hasher, T1)
@@ -406,23 +406,23 @@ class BulletProof:
 
             temp = NullPoint
             for i in range(0, logMN):
-                temp = add(temp, shamir2([proof.L[i], proof.R[i]], [sSq(w[i]), sSq(sInv(w[i]))]))
+                temp = add(temp, shamir([proof.L[i], proof.R[i]], [sSq(w[i]), sSq(sInv(w[i]))]))
             Z2 = add(Z2, multiply(temp, weight))
             z3 = sAdd(z3, sMul(sMul(sSub(proof.t, sMul(proof.a, proof.b)), x_ip), weight))
 
         #Perform all Checks
-        Check1 = shamir2([G1, H], [y0, y1])
+        Check1 = shamir([G1, H], [y0, y1])
         Check1 = add(Check1, neg(Y2))
         Check1 = add(Check1, neg(Y3))
         if (not eq(Check1, Y4)):
             print("Stage 1 Check Failed!")
             return False
 
-        Check2 = shamir2([G1, H], [sNeg(z1), z3])
+        Check2 = shamir([G1, H], [sNeg(z1), z3])
         Check2 = add(Check2, Z0)
 
         for i in range(0, maxMN):
-            Check2 = add(Check2, shamir2([Gi[i], Hi[i]], [z4[i], z5[i]]))
+            Check2 = add(Check2, shamir([Gi[i], Hi[i]], [z4[i], z5[i]]))
 
         #More Debug Printing
         if (False):
@@ -584,6 +584,7 @@ class BulletProof:
 if (True):
     N = 32   #bits
     m = 2    #commitments per proof
+    print()
     print("Generating Single Bullet Proof with " + str(m) + " commitment(s) of " + str(N) + " bits...")
 
     #Generate proof(s)
@@ -600,15 +601,15 @@ if (True):
     bp.Verify()
     t = time.time() - t
     print("Verify time: " + str(t / m) + "s")
-    print()
 
 #Multiple Bullet Proofs
-if (False):
+if (True):
     p = 2 #Number of Proofs
     m = 2 #Commitments per Proof
     bits = 32
     bp = [None]*p
 
+    print()
     print("Generating " + str(p) + " Bullet Proof(s) each with " + str(m) + " commitment(s) of " + str(bits) + " bits...")
 
     #Generate Proof(s)

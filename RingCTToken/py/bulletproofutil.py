@@ -164,7 +164,7 @@ def vSlice(a, start, stop):
 
     return out
 
-if (useShamir):
+if (useShamir):    
     def pvExpCustom(A, B, a, b):
         assert(len(a) == len(b))
         assert(len(A) >= len(a))
@@ -184,7 +184,7 @@ if (useShamir):
         return out
 
     def pvExp(a, b):
-        return pvExpCustom(Gi, Hi, a, b)
+        return pvExpCustom(Gi[:len(a)], Hi[:len(b)], a, b)
 else:
     def pvExpCustom(A, B, a, b):
         assert(len(a) == len(b))

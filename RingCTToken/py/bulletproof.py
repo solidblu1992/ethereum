@@ -102,7 +102,7 @@ class BulletProof:
             if (v[i] == 0):
                 V[i] = multiply(G1, gamma[i])
             else:
-                V[i] = add(multiply(H, v[i]), multiply(G1, gamma[i]))
+                V[i] = shamir2([G1, H], [gamma[i], v[i]])
 
         #Create A
         aL = [0]*(M*N)
@@ -167,8 +167,8 @@ class BulletProof:
 
         tau1 = getRandom()
         tau2 = getRandom()
-        T1 = add(multiply(H, t1), multiply(G1, tau1))
-        T2 = add(multiply(H, t2), multiply(G1, tau2))
+        T1 = shamir2([G1, H], [tau1, t1])
+        T2 = shamir2([G1, H], [tau2, t2])
 
         #Continue Fiat-Shamir
         hasher = add_point_to_hasher(hasher, T1)
@@ -310,23 +310,23 @@ class BulletProof:
             weight = 1
 
             #Reconstruct Challenges
-			#Hash V[], including array length
+	    #Hash V[], including array length
             hasher = sha3.keccak_256(int_to_bytes32(M*2))
             for j in range(0, M):
-                hasher = add_point_to_hasher(hasher, V[j])
+                hasher = add_point_to_hasher(hasher, proof.V[j])
 
 	    #Continue Hasher
             hasher = sha3.keccak_256(hasher.digest())
-            hasher = add_point_to_hasher(hasher, A)
-            hasher = add_point_to_hasher(hasher, S)
+            hasher = add_point_to_hasher(hasher, proof.A)
+            hasher = add_point_to_hasher(hasher, proof.S)
             y = bytes_to_int(hasher.digest()) % Ncurve
             
             hasher = sha3.keccak_256(int_to_bytes32(y))
             z = bytes_to_int(hasher.digest()) % Ncurve
             
             hasher = sha3.keccak_256(int_to_bytes32(z))
-            hasher = add_point_to_hasher(hasher, T1)
-            hasher = add_point_to_hasher(hasher, T2)
+            hasher = add_point_to_hasher(hasher, proof.T1)
+            hasher = add_point_to_hasher(hasher, proof.T2)
             x = bytes_to_int(hasher.digest()) % Ncurve
             
             hasher = sha3.keccak_256(int_to_bytes32(x))
@@ -349,8 +349,8 @@ class BulletProof:
             #Compute inner product challenges
             w = [0]*logMN
             for i in range(0, logMN):
-                hasher = add_point_to_hasher(hasher, L[i])
-                hasher = add_point_to_hasher(hasher, R[i])
+                hasher = add_point_to_hasher(hasher, proof.L[i])
+                hasher = add_point_to_hasher(hasher, proof.R[i])
                 w[i] = bytes_to_int(hasher.digest()) % Ncurve
                 hasher = sha3.keccak_256(int_to_bytes32(w[i]))
 
@@ -406,24 +406,23 @@ class BulletProof:
 
             temp = NullPoint
             for i in range(0, logMN):
-                temp = add(temp, multiply(proof.L[i], sSq(w[i])))
-                temp = add(temp, multiply(proof.R[i], sSq(sInv(w[i]))))
+                temp = add(temp, shamir2([proof.L[i], proof.R[i]], [sSq(w[i]), sSq(sInv(w[i]))]))
             Z2 = add(Z2, multiply(temp, weight))
             z3 = sAdd(z3, sMul(sMul(sSub(proof.t, sMul(proof.a, proof.b)), x_ip), weight))
 
         #Perform all Checks
-        Check1 = add(multiply(G1, y0), multiply(H, y1))
+        Check1 = shamir2([G1, H], [y0, y1])
         Check1 = add(Check1, neg(Y2))
         Check1 = add(Check1, neg(Y3))
         if (not eq(Check1, Y4)):
             print("Stage 1 Check Failed!")
             return False
 
-        Check2 = add(Z0, multiply(G1, sNeg(z1)))
-        Check2 = add(Check2, multiply(H, z3))
+        Check2 = shamir2([G1, H], [sNeg(z1), z3])
+        Check2 = add(Check2, Z0)
+
         for i in range(0, maxMN):
-            Check2 = add(Check2, multiply(Gi[i], z4[i]))
-            Check2 = add(Check2, multiply(Hi[i], z5[i]))
+            Check2 = add(Check2, shamir2([Gi[i], Hi[i]], [z4[i], z5[i]]))
 
         #More Debug Printing
         if (False):
@@ -581,109 +580,23 @@ class BulletProof:
                     print(", ", end="")
                 print(str(proofs[i].offset[j]), end="")
 
-def BulletProofTest1():
-    #Test verifying two bullet proofs with same number of commtiments and values of N
-    print()
-    print("Creating Bulletproof 1")
-    bp1 = BulletProof.Prove(13, N=8)
-    bp1.Print()
-
-    print("Verifying Bulletproof 1")
-    print(bp1.Verify())
-
-    print()
-    print("Creating Bulletproof 2")
-    bp2 = BulletProof.Prove(27, N=8)
-    bp2.Print()
-
-    print("Verifying Bulletproof 2")
-    print(bp2.Verify())
-
-    print()
-    print("Verifying Both Bulletproofs at Once")
-    bp = [bp1, bp2]
-    print(BulletProof.VerifyMulti(bp))
-    return bp
-
-def BulletProofTest2():
-    #Test verifying two bullet proofs at once with different values of N
-    print()
-    print("Creating Bulletproof 1")
-    bp1 = BulletProof.Prove([13, 4], N=8)
-    bp1.Print()
-
-    print("Verifying Bulletproof 1")
-    print(bp1.Verify())
-
-    print()
-    print("Creating Bulletproof 2")
-    bp2 = BulletProof.Prove([27, 1], N=16)
-    bp2.Print()
-
-    print("Verifying Bulletproof 2")
-    print(bp2.Verify())
-
-    print()
-    print("Verifying Both Bulletproofs at Once")
-    bp = [bp1, bp2]
-    print(BulletProof.VerifyMulti(bp))
-    return bp
-
-def BulletProofTest3():
-    #Test verifying two bullet proofs with different numbers of commitments
-    print()
-    print("Creating Bulletproof 1")
-    bp1 = BulletProof.Prove([13, 4, 8, 12], N=8)
-    bp1.Print()
-
-    print("Verifying Bulletproof 1")
-    print(bp1.Verify())
-
-    print()
-    print("Creating Bulletproof 2")
-    bp2 = BulletProof.Prove([27, 1], N=8)
-    bp2.Print()
-
-    print("Verifying Bulletproof 2")
-    print(bp2.Verify())
-
-    print()
-    print("Verifying Both Bulletproofs at Once")
-    bp = [bp1, bp2]
-    print(BulletProof.VerifyMulti(bp))
-    return bp
-
-def BulletProofTest4():
-    #Test verifying two bullet proofs with different numbers of commitments and different values of N
-    print()
-    print("Creating Bulletproof 1")
-    bp1 = BulletProof.Prove([13, 4, 8, 12], N=8)
-    bp1.Print()
-
-    print("Verifying Bulletproof 1")
-    print(bp1.Verify())
-
-    print()
-    print("Creating Bulletproof 2")
-    bp2 = BulletProof.Prove([27, 1], N=16)
-    bp2.Print()
-
-    print("Verifying Bulletproof 2")
-    print(bp2.Verify())
-
-    print()
-    print("Verifying Both Bulletproofs at Once")
-    bp = [bp1, bp2]
-    print(BulletProof.VerifyMulti(bp))
-    return bp
-
 #Single Bullet Proofs
 if (True):
-    N = 64   #bits
-    m = 2    #commitments per proof
+    N = 32   #bits
+    m = 1    #commitments per proof
     print("Generating Single Bullet Proof(s)...")
+
+    import time
+    t = time.time()
+    
     bp = BulletProof.Generate([0]*m, [0]*m, [0]*m, getRandom(m), N)
+
+    t = time.time() - t
+    
     bp.Print_MEW()
+
+    print()
+    print("Total time: " + str(t) + "s")
 
 #Multiple Bullet Proofs
 if (False):
@@ -692,7 +605,16 @@ if (False):
     m = 2 #Commitments per Proof
     bits = 32
     bp = [None]*p
+    
+    import time
+    t = time.time()
+    
     for i in range(0, p):
         bp[i] = BulletProof.Generate([5]*m, [17]*m, [0]*m, N=bits)
 
+    t = time.time() - t
+
     BulletProof.PrintMultiMEW(bp)
+
+    print()
+    print("Total time: " + str(t) + "s")

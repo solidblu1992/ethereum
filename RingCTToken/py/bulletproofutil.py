@@ -162,29 +162,35 @@ def vSlice(a, start, stop):
 
     return out
 
-def pvExp(a, b):
-    assert(len(a) == len(b))
-    assert(len(Gi) >= len(a))
-    assert(len(Hi) >= len(a))
+if (useShamir):
+    def pvExpCustom(A, B, a, b):
+        assert(len(a) == len(b))
+        assert(len(A) >= len(a))
+        assert(len(B) >= len(b))
 
-    out = NullPoint
-    for i in range(0, len(a)):
-        out = add(out, multiply(Gi[i], a[i]))
-        out = add(out, multiply(Hi[i], b[i]))
+        out = NullPoint
+        for i in range(0, len(a)):
+            out = add(out, shamir2([A[i], B[i]], [a[i], b[i]]))
 
-    return out
+        return out
 
-def pvExpCustom(A, B, a, b):
-    assert(len(A) == len(B))
-    assert(len(A) == len(a))
-    assert(len(A) == len(b))
+    def pvExp(a, b):
+        return pvExpCustom(Gi, Hi, a, b)
+else:
+    def pvExpCustom(A, B, a, b):
+        assert(len(a) == len(b))
+        assert(len(A) >= len(a))
+        assert(len(B) >= len(b))
 
-    out = NullPoint
-    for i in range(0, len(a)):
-        out = add(out, multiply(A[i], a[i]))
-        out = add(out, multiply(B[i], b[i]))
+        out = NullPoint
+        for i in range(0, len(a)):
+            out = add(out, multiply(A[i], a[i]))
+            out = add(out, multiply(B[i], b[i]))
 
-    return out
+        return out
+
+    def pvExp(a, b):
+        return pvExpCustom(Gi, Hi, a, b)
 
 def pvAdd(A, B):
     assert(len(A) == len(B))

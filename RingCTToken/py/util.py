@@ -12,11 +12,6 @@ counters = [0]*32
 useShamir = True    #Flag True to use Shamir's Trick to compute (a*A + b*B) effectively
 useWindowed = True  #Flag True to use windowed EC Multiplication
 
-#Windowed Elliptic Curve Multiplication Parameters
-wBits = 5
-wPow = 2**wBits
-wPowOver2 = wPow // 2
-
 def bytes_to_int(bytes):
     result = 0
 
@@ -213,71 +208,59 @@ def ExpandCompressTest():
 
 #Elliptic Curve Multiplication
 if (useWindowed):
-    def mods(d):
-        out = d % wPow
-        if out > wPowOver2:
-            out = out - wPow
-
-        return out
-
-    def precompute_points(P):
-        #Calculate Precompiled Points
-        P_pre = [None]*wPowOver2
-        P_pre[wPowOver2 // 2] = P
+    def precompute_points(P, wBits=5):        
+        #Calculate Precompiled Points: [1, 3, 5, ...]*P
+        wPowOver4 = 1 << (wBits-2)
+        P_pre = [None]*wPowOver4
+        P_pre[0] = P
         P2 = double(P)
-
-        index = wPowOver2 // 2
-        neg_index = index - 1
         
-        for i in range(0, wPowOver2 // 2):
-            if (i == 0):
-                P_pre[index] = P
-            else:
-                P_pre[index] = add(P_pre[index-1], P2)
-                
-            P_pre[neg_index] = neg(P_pre[index])
-
-            index += 1
-            neg_index -= 1
+        for i in range(1, len(P_pre)):
+            P_pre[i] = add(P_pre[i-1], P2)
 
         return P_pre
     
     G_pre = precompute_points(G1)
     H_pre = precompute_points(H)
     
-    def multiply(P, s):
+    def multiply(P, s, wBits=5):
+        wPow = (1 << wBits)
+        wPowOver2 = wPow // 2
+
         if (eq(P, G1)):
             P_pre = G_pre
         elif (eq(P, H)):
             P_pre = H_pre
         else:
-            P_pre = precompute_points(P)
+            P_pre = precompute_points(P, wBits)
         
         #Get NAF digits
         dj = []
         i = 0
         while (s > 0):
             if (s % 2) == 1:
-                d = mods(s)
+                d = s % wPow
+                if (d > wPowOver2):
+                    d = d - wPow
+                    
                 s -= d
                 
-                dj += [d]# + dj
+                dj += [d]
             else:
-                dj += [0]# + dj
+                dj += [0]
 
             s = s // 2
             i = i + 1
 
-        #print("dj: " + str(dj))
-        #print("P_pre: " + str(P_pre))
-
         Q = NullPoint
         for j in reversed(range(0, i)):
             Q = double(Q)
-            #print("j: " + str(j))
-            if (dj[j] != 0):
-                #print("index: " + str((dj[j] + wPowOver2 - 1) // 2))
-                Q = add(Q, P_pre[(dj[j] + wPowOver2 - 1) // 2])
+            if (dj[j] > 0):
+                index = (dj[j] - 1) // 2
+                Q = add(Q, P_pre[index])
+            elif (dj[j] < 0):
+                index = (-dj[j] - 1) // 2
+                Q = add(Q, neg(P_pre[index]))
             
         return Q
 

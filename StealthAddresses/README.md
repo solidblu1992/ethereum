@@ -21,7 +21,7 @@ e.g. Given if the public scan key is
 
 and the public spend key is
 
-0x28b3b63ae513fcb9fc28a01e9d024cbe4a1fa4571bf577d28c29e32d4bd9ebbac,
+0x28b3b63ae513fcb9fc28a01e9d024cbe4a1fa4571bf577d28c29e32d4bd9ebbac
 
 then the resulting stealth address would be 
 

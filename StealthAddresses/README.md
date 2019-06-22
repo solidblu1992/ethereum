@@ -12,8 +12,8 @@ Each stealth address is 65 bytes long and is comprised of three components: a si
 | Sign Byte | Public Scan Key Sign | Public Spend Key Sign |
 | :-------: | :------------------: | :-------------------: |
 |       0x1 |                  0x2 |                   0x2 |
-|       0x2 |                  0x3 |                   0x2 |
-|       0x4 |                  0x2 |                   0x3 |
+|       0x3 |                  0x3 |                   0x2 |
+|       0x5 |                  0x2 |                   0x3 |
 |       0x7 |                  0x3 |                   0x3 |
 
 ### Example

@@ -40,5 +40,6 @@ if __name__ == "__main__":
     stealth_address = 0x1675ac9304b7cfe986d286ebb910ba217f59ed5bb36deb2fa643c6b7847252d638b3b63ae513fcb9fc28a01e9d024cbe4a1fa4571bf577d28c29e32d4bd9ebbac
     out = stealth_send(stealth_address)
 
-    print("New tx addresses " + hex(stealth_address))
+    print("New tx addresses for stealth address:")
+    print(hex(stealth_address))
     print(out)

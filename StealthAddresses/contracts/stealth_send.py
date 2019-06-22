@@ -1,5 +1,8 @@
 from stealth_util import *
 
+#For a given stealth address, create new stealth transaction addresses
+#Each tx has a key (compressed ephemeral point) and a Ethereum address
+#Send ether to the address and then log the point and address in the registry
 def stealth_send(stealth_address, count=3):
     if type(stealth_address) == int:
         stealth_address = int.to_bytes(stealth_address, 65, 'big')

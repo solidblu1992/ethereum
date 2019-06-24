@@ -19,7 +19,7 @@ def stealth_send(stealth_address, count=3):
 
         tabs += 1
         out += "\t"*tabs + "\"key\":\"" + R + "\",\n"
-        out += "\t"*tabs + "\"addr\":\"" + addr + "\"\n"
+        out += "\t"*tabs + "\"address\":\"" + addr + "\"\n"
         tabs -= 1
         
         out += "\t"*tabs + "}"
@@ -37,7 +37,7 @@ def stealth_send(stealth_address, count=3):
     return out
 
 if __name__ == "__main__":
-    stealth_address = 0x1675ac9304b7cfe986d286ebb910ba217f59ed5bb36deb2fa643c6b7847252d638b3b63ae513fcb9fc28a01e9d024cbe4a1fa4571bf577d28c29e32d4bd9ebbac
+    stealth_address = 0x37e6b0cc0965bf5cff98f93cce3b461ef54eeb8e8b5e63156bf87c018a02d8844a6c8cfa3271b794e1018db2a6e6e218c36934c28b33fd18800a8f9a68abd57f5
     out = stealth_send(stealth_address)
 
     print("New tx addresses for stealth address:")

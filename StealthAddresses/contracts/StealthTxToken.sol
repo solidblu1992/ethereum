@@ -76,47 +76,46 @@ contract StealthTxToken {
 	}
 	
 	function getDelegatedWithdrawMessageLength() internal pure returns (uint) {
-		//Loosely Packed, 32-bytes per member
-		//Someday, maybe pack tighter
-		//32*3 + length = 128
-		return 128;
+		//Tightly Packed
+		//84 = 20 for src_addr, 32 for tokens, 32 for nonce
+		return 84;
 	}
 	
 	function getDelegatedTransferMessageLength() internal pure returns (uint) {
-		//Loosely Packed, 32-bytes per member
-		//Someday, maybe pack tighter
-		//32*6 + length = 224
-		return 224;
+		//Tightly Packed
+		//137 = 20 for src_addr, 32 for tokens, 32 for nonce, 
+		//      20 for dest_addr, 1 for compressed sign, and 32 for x coordinate
+		return 137;
 	}
 	
 	function unpackDelegatedTransferMessage(bytes memory message)
 		internal pure returns (DelegatedTransferMessage memory msg_out)
 	{
 		//Unpack message into DelegatedTransferMessage
-		require(message.length == getDelegatedTransferMessageLength());
+		require(message.length == getDelegatedTransferMessageLength(), "bad message");
 		
-		//Load bytes 32 at a time
+		//Load bytes 32 at a time, shift off unused bits
 		uint buffer;
-		uint offset = 0;
+		uint offset = 32; //1st byte is length, unneeded
 		
 		assembly { buffer := mload(add(message, offset)) }
-		msg_out.src_addr = address(buffer);
-		offset += 0x20;
+	    msg_out.src_addr = address(buffer >> 96); //Shift off unused bytes (256-160 = 96)
+	    offset += 20;
+	    
+	    assembly { buffer := mload(add(message, offset)) }
+	    msg_out.tokens = buffer;
+	    offset += 32;
+	    
+	    assembly { buffer := mload(add(message, offset)) }
+	    msg_out.nonce = buffer;
+	    offset += 32;
 		
 		assembly { buffer := mload(add(message, offset)) }
-		msg_out.tokens = buffer;
-		offset += 0x20;
+		msg_out.dest_addr = address(buffer >> 96); //Shift off unused bytes (256-160 = 96)
+		offset += 20;
 		
 		assembly { buffer := mload(add(message, offset)) }
-		msg_out.nonce = buffer;
-		offset += 0x20;
-		
-		assembly { buffer := mload(add(message, offset)) }
-		msg_out.dest_addr = address(buffer);
-		offset += 0x20;
-		
-		assembly { buffer := mload(add(message, offset)) }
-		buffer >>= 248;
+		buffer >>= 248; //Shift off unused bits (256-8 = 248)
 		require(buffer == 0x02 || buffer == 0x03);
 		if (buffer == 0x2) {
 		    msg_out.point_compressed_sign = 0x02;
@@ -124,7 +123,7 @@ contract StealthTxToken {
 		else {
 		    msg_out.point_compressed_sign = 0x03;
 		}
-		offset += 0x20;
+		offset += 1;
 		
 		assembly { buffer := mload(add(message, offset)) }
 		msg_out.point_compressed_x = bytes32(buffer);
@@ -134,22 +133,22 @@ contract StealthTxToken {
 		internal pure returns (DelegatedWithdrawMessage memory msg_out)
 	{
 		//Unpack message into DelegatedWithdrawMessage
-		require(message.length == getDelegatedWithdrawMessageLength());
+		require(message.length == getDelegatedWithdrawMessageLength(), "bad message");
 		
-		//Load bytes 32 at a time
-		uint buffer;
-		uint offset = 0;
-		
-		assembly { buffer := mload(add(message, offset)) }
-		msg_out.src_addr = address(buffer);
-		offset += 0x20;
-		
-		assembly { buffer := mload(add(message, offset)) }
-		msg_out.tokens = buffer;
-		offset += 0x20;
-		
-		assembly { buffer := mload(add(message, offset)) }
-		msg_out.nonce = buffer;
+		//Load bytes 32 at a time, shift off unused bits
+	    uint buffer;
+	    uint offset = 32; //1st byte is length, unneeded
+	    
+	    assembly { buffer := mload(add(message, offset)) }
+	    msg_out.src_addr = address(buffer >> 96); //Shift off unused bytes (256-160 = 96)
+	    offset += 20;
+	    
+	    assembly { buffer := mload(add(message, offset)) }
+	    msg_out.tokens = buffer;
+	    offset += 32;
+	    
+	    assembly { buffer := mload(add(message, offset)) }
+	    msg_out.nonce = buffer;
 	}
 	
 	//Public Functions
@@ -206,7 +205,7 @@ contract StealthTxToken {
 															dmsg.dest_addr, dmsg.point_compressed_sign, dmsg.point_compressed_x	));
 															
 		if (_v < 27) { _v += 27; }
-		require(ecrecover(dmsg_hash, _v, _r, _s) == dmsg.src_addr);
+		require(ecrecover(dmsg_hash, _v, _r, _s) == dmsg.src_addr, "bad signature");
 		
 		//Perform Transfer		
 		_balances[dmsg.src_addr] -= dmsg.tokens;
@@ -231,7 +230,7 @@ contract StealthTxToken {
 		bytes32 dmsg_hash = keccak256(	abi.encodePacked(	dmsg.src_addr, dmsg.tokens, dmsg.nonce	));
 															
 		if (_v < 27) { _v += 27; }
-		require(ecrecover(dmsg_hash, _v, _r, _s) == dmsg.src_addr);
+		require(ecrecover(dmsg_hash, _v, _r, _s) == dmsg.src_addr, "bad signature");
 		
 		//Perform Transfer		
 		_balances[dmsg.src_addr] -= dmsg.tokens;

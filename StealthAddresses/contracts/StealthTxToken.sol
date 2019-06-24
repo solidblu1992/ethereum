@@ -1,10 +1,18 @@
 pragma solidity ^0.5.9;
 
 contract StealthTxToken {
-    constructor() public {}
-    function DebugKill() public { selfdestruct(msg.sender); }
+    address private debugOwner;
     
-	event TokensSpentEvent {
+    constructor() public {
+        debugOwner = msg.sender;
+    }
+    
+    function DebugKill() public {
+        require(msg.sender == debugOwner);
+        selfdestruct(msg.sender);
+    }
+    
+	event TokensSpentEvent (
 		//Source Data
 		address indexed _src_addr,
 		uint _tokens,
@@ -14,7 +22,7 @@ contract StealthTxToken {
 		address indexed _dest_addr,
         byte _point_compressed_sign,
         bytes32 _point_compressed_x
-	}	
+	);
 	
     event DepositEvent (
         address indexed _dest_addr,
@@ -46,6 +54,10 @@ contract StealthTxToken {
 		uint tokens;
 		uint nonce;		
 	}
+	
+	//Constant Variables
+	string public name = "StealthERC";
+	uint public decimals = 18;
 		
 	//State Variables
 	mapping (address => uint) private _balances;
@@ -66,15 +78,15 @@ contract StealthTxToken {
 	function getDelegatedWithdrawMessageLength() internal pure returns (uint) {
 		//Loosely Packed, 32-bytes per member
 		//Someday, maybe pack tighter
-		//32*3 = 96;
-		return 96;
+		//32*3 + length = 128
+		return 128;
 	}
 	
 	function getDelegatedTransferMessageLength() internal pure returns (uint) {
 		//Loosely Packed, 32-bytes per member
 		//Someday, maybe pack tighter
-		//32*6 = 192;
-		return 192;
+		//32*6 + length = 224
+		return 224;
 	}
 	
 	function unpackDelegatedTransferMessage(bytes memory message)
@@ -104,7 +116,8 @@ contract StealthTxToken {
 		offset += 0x20;
 		
 		assembly { buffer := mload(add(message, offset)) }
-		require(buffer == 0x2 || buffer == 0x3);
+		buffer >>= 248;
+		require(buffer == 0x02 || buffer == 0x03);
 		if (buffer == 0x2) {
 		    msg_out.point_compressed_sign = 0x02;
 		}
@@ -180,7 +193,7 @@ contract StealthTxToken {
 								uint8 _v, bytes32 _r, bytes32 _s) public
 	{
 		//Unpack message from bytes into struct
-	    DelegatedTransferMessage memory dmsg = unpackDelegateTransferMessgage(_message);
+	    DelegatedTransferMessage memory dmsg = unpackDelegatedTransferMessage(_message);
 		
 		//Check some inputs
 		require(checkPointSign(dmsg.point_compressed_sign));
@@ -192,13 +205,13 @@ contract StealthTxToken {
 		bytes32 dmsg_hash = keccak256(	abi.encodePacked(	dmsg.src_addr, dmsg.tokens, dmsg.nonce,
 															dmsg.dest_addr, dmsg.point_compressed_sign, dmsg.point_compressed_x	));
 															
-		if (_v < 27) { v += 27; }
+		if (_v < 27) { _v += 27; }
 		require(ecrecover(dmsg_hash, _v, _r, _s) == dmsg.src_addr);
 		
 		//Perform Transfer		
 		_balances[dmsg.src_addr] -= dmsg.tokens;
 		_balances[dmsg.dest_addr] += dmsg.tokens;
-		_nonce[dmsg.src_addr]++;
+		_nonces[dmsg.src_addr]++;
 		
 		emit TokensSpentEvent(	dmsg.src_addr, dmsg.tokens, dmsg.nonce,
 								dmsg.dest_addr, dmsg.point_compressed_sign, dmsg.point_compressed_x);	
@@ -215,15 +228,16 @@ contract StealthTxToken {
 		require(_nonces[dmsg.src_addr] == dmsg.nonce);
 		
 		//Check ecrecover
-		bytes32 dmsg_hash = keccak256(	abi.encodePacked(	dmsg.src_addr, dmsg.tokens, dmsg.nonce	);
+		bytes32 dmsg_hash = keccak256(	abi.encodePacked(	dmsg.src_addr, dmsg.tokens, dmsg.nonce	));
 															
-		if (_v < 27) { v += 27; }
+		if (_v < 27) { _v += 27; }
 		require(ecrecover(dmsg_hash, _v, _r, _s) == dmsg.src_addr);
 		
 		//Perform Transfer		
 		_balances[dmsg.src_addr] -= dmsg.tokens;
 		_totalSupply -= dmsg.tokens;
-		_nonce[dmsg.src_addr]++;
+		_nonces[dmsg.src_addr]++;
 		
-		emit WithdrawalEvent(	dmsg.src_addr, dmsg.tokens, dmsg.nonce	);		
+		emit WithdrawalEvent(	dmsg.src_addr, dmsg.tokens, dmsg.nonce	);
 	}
+}

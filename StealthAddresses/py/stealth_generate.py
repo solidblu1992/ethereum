@@ -4,10 +4,22 @@ from py_ecc import secp256k1
 from eth_keyfile import create_keyfile_json
 from stealth_util import *
 from random import SystemRandom
+import os.path
 
 #Generate a new spend and scan key pair and calculate their stealth address
 #Store resulting stealth address along with the two key pairs in stealth_address.json
 def stealth_generate(filename):
+    #Check to see if file is valid and does not already exist
+    if type(filename) != str or len(filename) == 0:
+        print("Stealth Address Generation Failed!")
+        print("Please enter valid filename!")
+        return
+        
+    if os.path.exists(filename):
+        print("Stealth Address Generation Failed!")
+        print("File \"" + filename + "\" already exists!")
+        return
+    
     #Get password for new keypair
     password = getpass()
     

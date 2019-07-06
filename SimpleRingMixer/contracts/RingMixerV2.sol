@@ -1,20 +1,17 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.5.9;
 
 contract RingMixerV2 {
-    //Debug Code
-    address public owner;
-    function RingMixerV2() public {
-        //Debug Code
-        owner = msg.sender;
-        
+    address private debugOwner;
+    
+    constructor() public {
+        debugOwner = msg.sender;
         G1[0] = 1;
         G1[1] = 2;
         H = HashPoint(G1);
     }
     
-    function Kill() public {
-        if ( (msg.sender != owner) && (owner != 0) ) revert();
-
+    function DebugKill() public {
+        require(msg.sender == debugOwner);
         selfdestruct(msg.sender);
     }
     
@@ -62,7 +59,7 @@ contract RingMixerV2 {
     }
     
     //Equally distribute Ether as RingMixer tokens to the specified RingMixer addresses
-    function DepositN(address[] destination)
+    function DepositN(address[] memory destination)
         payable public returns (bool success)
     {
         //Must have more than one address specified
@@ -96,7 +93,7 @@ contract RingMixerV2 {
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //   success (bool) - true/false indicating if signature is valid on message
-    function Withdraw(address[] destination, uint256[] value, uint256[] signature)
+    function Withdraw(address[] memory destination, uint256[] memory value, uint256[] memory signature)
         public returns (bool success) 
     {
         //Check Array Bounds
@@ -149,23 +146,24 @@ contract RingMixerV2 {
         if (success) {
             KeyImageUsed[signature[0]] = true;
             for (i = 0; i < destination.length; i++) {
-                destination[i].transfer(value[i]);
+                address payable dest = address(uint160(destination[i]));
+                dest.transfer(value[i]);
             }
         }
     }
     
     //Address Functions - Convert compressed public key into RingMixer address
     function GetAddress(uint256 PubKey)
-        public constant returns (address addr)
+        public view returns (address addr)
     {
         uint256[2] memory temp;
         temp = ExpandPoint(PubKey);
-        addr = address( keccak256(temp[0], temp[1]) );
+        addr = address( uint(keccak256(abi.encodePacked(temp[0], temp[1])) ));
     }
     
     //Base EC Functions
-    function ecAdd(uint256[2] p0, uint256[2] p1)
-        public constant returns (uint256[2] p2)
+    function ecAdd(uint256[2] memory p0, uint256[2] memory p1)
+        public view returns (uint256[2] memory p2)
     {
         assembly {
             //Get Free Memory Pointer
@@ -178,7 +176,7 @@ contract RingMixerV2 {
             mstore(add(p, 0x60), mload(add(p1, 0x20)))
             
             //Call ECAdd
-            let success := call(sub(gas, 2000), 0x06, 0, p, 0x80, p, 0x40)
+            let success := staticcall(sub(gas, 2000), 0x06, p, 0x80, p, 0x40)
             
             // Use "invalid" to make gas estimation work
  			switch success case 0 { revert(p, 0x80) }
@@ -189,8 +187,8 @@ contract RingMixerV2 {
         }
     }
     
-    function ecMul(uint256[2] p0, uint256 s)
-        public constant returns (uint256[2] p1)
+    function ecMul(uint256[2] memory  p0, uint256 s)
+        public view returns (uint256[2] memory p1)
     {
         assembly {
             //Get Free Memory Pointer
@@ -202,7 +200,7 @@ contract RingMixerV2 {
             mstore(add(p, 0x40), s)
             
             //Call ECAdd
-            let success := call(sub(gas, 2000), 0x07, 0, p, 0x60, p, 0x40)
+            let success := staticcall(sub(gas, 2000), 0x07, p, 0x60, p, 0x40)
             
             // Use "invalid" to make gas estimation work
  			switch success case 0 { revert(p, 0x80) }
@@ -213,7 +211,7 @@ contract RingMixerV2 {
         }
     }
     
-    function CompressPoint(uint256[2] Pin)
+    function CompressPoint(uint256[2] memory Pin)
         public pure returns (uint256 Pout)
     {
         //Store x value
@@ -226,7 +224,7 @@ contract RingMixerV2 {
     }
     
     function EvaluateCurve(uint256 x)
-        public constant returns (uint256 y, bool onCurve)
+        public view returns (uint256 y, bool onCurve)
     {
         uint256 y_squared = mulmod(x,x, P);
         y_squared = mulmod(y_squared, x, P);
@@ -248,7 +246,7 @@ contract RingMixerV2 {
             mstore(add(p, 0xA0), p_local)   //Modulus
             
             //Call Big Int Mod Exp
-            let success := call(sub(gas, 2000), 0x05, 0, p, 0xC0, p, 0x20)
+            let success := staticcall(sub(gas, 2000), 0x05, p, 0xC0, p, 0x20)
             
             // Use "invalid" to make gas estimation work
  			switch success case 0 { revert(p, 0xC0) }
@@ -262,7 +260,7 @@ contract RingMixerV2 {
     }
     
     function ExpandPoint(uint256 Pin)
-        public constant returns (uint256[2] Pout)
+        public view returns (uint256[2] memory Pout)
     {
         //Get x value (mask out sign bit)
         Pout[0] = Pin & (~ECSignMask);
@@ -298,18 +296,18 @@ contract RingMixerV2 {
     }
     
     //=====Ring Signature Functions=====
-    function HashFunction(RingMessage message, uint256[2] left, uint256[2] right)
+    function HashFunction(RingMessage memory message, uint256[2] memory left, uint256[2] memory right)
         internal pure returns (uint256 h)
     {
-        return (uint256(keccak256(message.destination, message.value, left[0], left[1], right[0], right[1])) % N);
+        return (uint256(keccak256(abi.encodePacked(message.destination, message.value, left[0], left[1], right[0], right[1]))) % N);
     }
     
     //Return H = alt_bn128 evaluated at keccak256(p)
-    function HashPoint(uint256[2] p)
-        internal constant returns (uint256[2] h)
+    function HashPoint(uint256[2] memory p)
+        internal view returns (uint256[2] memory h)
     {
         bool onCurve;
-        h[0] = uint256(keccak256(p[0], p[1])) % N;
+        h[0] = uint256(keccak256(abi.encodePacked(p[0], p[1]))) % N;
         
         while(!onCurve) {
             (h[1], onCurve) = EvaluateCurve(h[0]);
@@ -318,16 +316,16 @@ contract RingMixerV2 {
         h[0]--;
     }
 
-    function KeyImage(uint256 xk, uint256[2] Pk)
-        internal constant returns (uint256[2] Ix)
+    function KeyImage(uint256 xk, uint256[2] memory Pk)
+        internal view returns (uint256[2] memory Ix)
     {
         //Ix = xk * HashPoint(Pk)
         Ix = HashPoint(Pk);
         Ix = ecMul(Ix, xk);
     }
     
-    function RingStartingSegment(RingMessage message, uint256 alpha, uint256[2] P0)
-        internal constant returns (uint256 c0)
+    function RingStartingSegment(RingMessage memory message, uint256 alpha, uint256[2] memory P0)
+        internal view returns (uint256 c0)
     {
         //Memory Registers
         uint256[2] memory left;
@@ -340,8 +338,8 @@ contract RingMixerV2 {
         c0 = HashFunction(message, left, right);
     }
     
-    function RingSegment(RingMessage message, uint256 c0, uint256 s0, uint256[2] P0, uint256[2] Ix)
-        internal constant returns (uint256 c1)
+    function RingSegment(RingMessage memory message, uint256 c0, uint256 s0, uint256[2] memory P0, uint256[2] memory Ix)
+        internal view returns (uint256 c1)
     {
         //Memory Registers
         uint256[2] memory temp;
@@ -392,8 +390,8 @@ contract RingMixerV2 {
     //      signature[2+N   ... 2*N+1  ] - Public Keys (compressed) - total of N Public Keys
     //      signature[2*N+2 ... 31     ] - Padding (0)
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
-    function RingSign(RingMessage message, uint256[] data)
-        internal constant returns (uint256[32] signature)
+    function RingSign(RingMessage memory message, uint256[] memory data)
+        internal view returns (uint256[32] memory signature)
     {
         //Check Array Lengths
         require( data.length >= 6 ); //Minimum size (2 PubKeys) = (2*2+2) = 6
@@ -447,8 +445,8 @@ contract RingMixerV2 {
         signature[2+data[0]] = SubMul(data[2+data[0]], c, data[1]);
     }
     
-    function RingSign_User(address[] destination, uint256[] value, uint256[] data)
-        public constant returns (uint256[32] signature)
+    function RingSign_User(address[] memory destination, uint256[] memory value, uint256[] memory data)
+        public view returns (uint256[32] memory signature)
     {
         return RingSign(RingMessage(destination, value), data);
     }
@@ -465,8 +463,8 @@ contract RingMixerV2 {
     //      e.g. N=3; signature = { Ik, c0, s0, s1, s2, PubKey0, PubKey1, PubKey2 }
     //Outputs:
     //  success (bool) - true/false indicating if signature is valid on message
-    function RingVerify(RingMessage message, uint256[] signature)
-        internal constant returns (bool success)
+    function RingVerify(RingMessage memory message, uint256[] memory signature)
+        internal view returns (bool success)
     {
         //Check Array Lengths
         require( signature.length >= 6 ); //Minimum size (2 PubKeys) = (2*2+2) = 6
@@ -495,8 +493,8 @@ contract RingMixerV2 {
         success = (c == signature[1]);
     }
     
-    function RingVerify_User(address[] destination, uint256[] value, uint256[] signature)
-        public constant returns (bool success)
+    function RingVerify_User(address[] memory destination, uint256[] memory value, uint256[] memory signature)
+        public view returns (bool success)
     {
         return RingVerify(RingMessage(destination, value), signature);
     }

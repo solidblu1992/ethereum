@@ -24,3 +24,9 @@ $RECYCLE.BIN/
 
 #Python Cache Files
 *.pyc
+
+#Special Files
+db.json
+input.json
+sync.json
+wallet.json

@@ -4,8 +4,9 @@ from random import SystemRandom
 
 #"Private Keys"
 sr = SystemRandom()
-asset_address = 0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359 #DAI
+asset_address = 0#0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359 #DAI
 v = 1
+compress_proof = True
 bf = sr.getrandbits(256)
 
 G1 = bn128.G1
@@ -26,11 +27,7 @@ def H_from_address(address):
 
     return (x, y)
 
-if asset_address == 0:
-    H = (   bn128.FQ(0x2854ddec56b97fb3a6d501b8a6ff07891ce7aeb22c1cc74cf0a18ebc3f15220b),
-            bn128.FQ(0x23a967b0d240d4264fea929d6a02ba4b7c612c0a4ef611e92eb011aa854cdbf7)    )
-else:
-    H = H_from_address(asset_address)
+H = H_from_address(asset_address)
 
 #Calculate Ring
 C = bn128.multiply(G1, bf)
@@ -74,13 +71,27 @@ else:
     s0 = (alpha - c0*bf) % bn128.curve_order
 
 #Output
-print(hex(C[0].n))
-print(hex(C[1].n))
-print(hex(H[0].n))
-print(hex(H[1].n))
-print(hex(c0))
-print(hex(s0))
-print(hex(s1))
+print("Data:")
+print("0x", end="")
+
+if compress_proof:
+    c_compressed = C[0].n
+
+    if (C[1].n & 1 == 1):
+        c_compressed |= 0x8000000000000000000000000000000000000000000000000000000000000000
+
+    print(c_compressed.to_bytes(32, 'big').hex(), end="")        
+else:
+    print(C[0].n.to_bytes(32, 'big').hex(), end="")
+    print(C[1].n.to_bytes(32, 'big').hex(), end="")
+#print(hex(H[0].n.to_bytes(20, 'big').hex(), end="")
+#print(hex(H[1].n.to_bytes(20, 'big').hex(), end="")
+print(c0.to_bytes(32, 'big').hex(), end="")
+print(s0.to_bytes(32, 'big').hex(), end="")
+print(s1.to_bytes(32, 'big').hex())
+
+print()
+print("asset_address: 0x" + asset_address.to_bytes(20, 'big').hex())
 
 
 

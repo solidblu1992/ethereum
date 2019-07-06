@@ -18,7 +18,62 @@ library OneBitRangeProof {
     }	
 	
 	//High Level Functions
-	function FromBytes(bytes memory b) internal view returns (Data[] memory proof) {
+	function FromBytes(bytes memory b, uint index) internal view returns (Data memory proof) {
+		//b must be a multiple of 32*4=128 or 32*5=160 bytes long
+		bool compressed_proof = false;
+		uint num_proofs = 0;
+		if (b.length % 128 == 0) {
+		    compressed_proof = true;
+			num_proofs = b.length / 128;
+		}
+		else {
+		    require(b.length % 160 == 0);
+			num_proofs = b.length / 160;
+		}
+		
+		//Check to see if b is long enough for requested index
+		require(index < num_proofs);
+		
+		//Load bytes 32 at a time, shift off unused bits
+		uint buffer;
+		uint offset;
+		
+		if (compressed_proof) {
+			offset = 32 + 128*index;
+		}
+		else {
+			offset = 32 + 160*index;
+		}
+		
+		//Extract Proof
+		if (compressed_proof) {
+			assembly { buffer := mload(add(b, offset)) }
+			(proof.Cx, proof.Cy) = AltBN128.ExpandPoint(buffer);
+			offset += 32;
+		}
+		else {
+			assembly { buffer := mload(add(b, offset)) }
+			proof.Cx = buffer;
+			offset += 32;
+			
+			assembly { buffer := mload(add(b, offset)) }
+			proof.Cy = buffer;
+			offset += 32;
+		}
+		
+		assembly { buffer := mload(add(b, offset)) }
+		proof.c0 = buffer;
+		offset += 32;
+		
+		assembly { buffer := mload(add(b, offset)) }
+		proof.s0 = buffer;
+		offset += 32;
+		
+		assembly { buffer := mload(add(b, offset)) }
+		proof.s1 = buffer;
+	}
+	
+	function FromBytesAll(bytes memory b) internal view returns (Data[] memory proof) {
 		//b must be a multiple of 32*4=128 or 32*5=160 bytes long
 		bool compressed_proof = false;
 		

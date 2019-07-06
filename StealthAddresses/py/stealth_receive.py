@@ -9,10 +9,10 @@ from stealth_util import *
 #If they belong to this stealth address, create keystore files for these tx's with same password
 def stealth_receive(directory):
     #Import Scan and Spend Key
-    password = getpass()
-
-    scan_key = decode_keyfile_json(load_keyfile(directory + 'scan_key.json'), bytes(password, 'utf'))
-    spend_key = decode_keyfile_json(load_keyfile(directory + 'spend_key.json'), bytes(password, 'utf'))
+    wallet = GetKeysFromFile(directory + 'wallet.json')
+    scan_key = wallet['scan_key']
+    spend_key = wallet['spend_key']
+    del wallet
 
     pub_scan_key = secp256k1.privtopub(scan_key)
     pub_spend_key = secp256k1.privtopub(spend_key)
@@ -46,7 +46,6 @@ def stealth_receive(directory):
         if addr == addr_exp:
             print("HIT!")
             priv_key = GetPrivKeyFromSharedSecret(ss, spend_key)
-
             filename = "Keystore--" + hex(int.from_bytes(addr_exp, 'big'))[2:] + ".json"
             
             print("Creating " + filename + " ... ", end="")
@@ -59,6 +58,9 @@ def stealth_receive(directory):
             print("COMPLETE!")
         else:
             print("MISS!")
+
+    del scan_key
+    del spend_key
 
 if __name__ == "__main__":
     directory = "C:/"

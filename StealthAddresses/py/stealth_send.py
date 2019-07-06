@@ -3,7 +3,7 @@ from stealth_util import *
 #For a given stealth address, create new stealth transaction addresses
 #Each tx has a key (compressed ephemeral point) and a Ethereum address
 #Send ether to the address and then log the point and address in the registry
-def stealth_send(stealth_address, count=3):
+def stealth_send(stealth_address, count=5):
     if type(stealth_address) == int:
         stealth_address = int.to_bytes(stealth_address, 65, 'big')
         
@@ -37,9 +37,9 @@ def stealth_send(stealth_address, count=3):
     return out
 
 if __name__ == "__main__":
-    stealth_address = 0x37e6b0cc0965bf5cff98f93cce3b461ef54eeb8e8b5e63156bf87c018a02d8844a6c8cfa3271b794e1018db2a6e6e218c36934c28b33fd18800a8f9a68abd57f5
-    out = stealth_send(stealth_address)
+    wallet = ReadAddressFromFile('wallet.json')
+    out = stealth_send(wallet['stealth_address'])
 
     print("New tx addresses for stealth address:")
-    print(hex(stealth_address))
+    print("0x" + wallet['stealth_address'].hex())
     print(out)

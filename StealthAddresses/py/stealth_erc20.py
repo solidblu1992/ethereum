@@ -1,14 +1,69 @@
-from web3 import Web3, HTTPProvider, WebsocketProvider
+import os
 import json
+from web3 import Web3, HTTPProvider, WebsocketProvider
+from eth_keyfile import create_keyfile_json
+from stealth_util import *
 
-provider = HTTPProvider("http://localhost:8545")
+#Connect to Web3
+provider = HTTPProvider("http://127.0.0.1:30303")
 w3 = Web3(provider)
 assert w3.isConnected()
 
 contract_addr = "0xb5267Fbbce2D254017F3c9c61cE0673526aE22cD"
 
-with open("../contracts/StealthTxTokenABI.json") as f:
+with open("../contracts/StealthTxToken.abi") as f:
     info_json = json.load(f)
     
-abi = info_json["result"]
+abi = info_json["abi"]
 contract = w3.eth.contract(address=contract_addr, abi=abi)
+
+#Check for previous sync status
+fromBlock=1
+if os.path.exists("sync.json"):
+    with open("sync.json") as f:
+        sync_json = json.load(f)
+
+    fromBlock = (sync_json["lastBlock"])
+else:
+    sync_json = dict()
+    
+#Check events from contract
+block_num = w3.eth.blockNumber
+ef_withdraw = contract.events.DepositEvent.createFilter(fromBlock=fromBlock)
+ef_transfer = contract.events.TokensSpentEvent.createFilter(fromBlock=fromBlock)
+
+#Import Stealth Wallet
+password = None
+wallet = ReadKeysFromFile('wallet.json')
+entries = ef_withdraw.get_all_entries() + ef_transfer.get_all_entries()
+print("Reading contract, " + str(len(entries)) + " entries...")
+for event in entries:
+    dest_addr = bytes_from_hex_string(event['args']['_dest_addr'], 20)
+    R = event['args']['_point_compressed_sign'] + event['args']['_point_compressed_x']
+    point = ExpandPoint(R)
+    ss = GetSharedSecret(point, wallet['scan_key'])
+    addr_test = GetAddrFromSharedSecret(ss, wallet['pub_spend_key'])
+
+    if dest_addr == addr_test:
+        print("HIT!")
+        
+        priv_key = GetPrivKeyFromSharedSecret(ss, wallet['spend_key'])
+
+        filename = "Keystore--" + hex(int.from_bytes(addr_test, 'big'))[2:] + ".json"
+            
+        print("Creating " + filename + " ... ", end="")
+
+        if password==None:
+            password = getpass()
+            
+        with open(filename, mode='w') as file:
+            js = create_keyfile_json(int.to_bytes(priv_key, 32, 'big'), bytes(password, 'utf'))
+            json.dump(js, file)
+
+        print("COMPLETE!")
+
+sync_json["lastBlock"] = block_num
+
+#Rewrite Sync File
+with open("sync.json", "w") as f:
+    json.dump(sync_json, f)

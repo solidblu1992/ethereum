@@ -1,7 +1,19 @@
 from py_ecc.fields import FQ
 from py_ecc.secp256k1 import secp256k1 as curve
+from eth_keyfile import decode_keyfile_json
+import json
+from getpass import getpass
 
 #Utility Functions
+#general
+def bytes_from_hex_string(s, desired_byte_length=0):
+    #Extract Address
+    b = s[2:]
+    while len(b) < (desired_byte_length*2):
+        b = "0" + b      
+    b = bytes.fromhex(b)
+    return b
+
 #secp256k1
 def CompressPoint(Pin):
     if (type(Pin) != tuple):
@@ -120,3 +132,38 @@ def CreateStealthTx(pub_scan_key, pub_spend_key):
     R = hex(int.from_bytes(R, 'big'))
     addr = hex(int.from_bytes(addr, 'big'))
     return R, addr
+
+#File Functions
+def ReadAddressFromFile(filename):
+    out = dict()
+    with open(filename) as f:
+        #Read File
+        file_json = json.load(f)
+
+        #Extract Address
+        addr = bytes_from_hex_string(file_json['stealth_address'], 65)
+        out['stealth_address'] = addr
+        out['pub_scan_key'], out['pub_spend_key'] = GetKeysFromStealthAddress(addr)
+
+    return out
+
+def ReadKeysFromFile(filename, password=None):
+    out = dict()
+    with open(filename) as f:
+        #Read File
+        file_json = json.load(f)
+
+        #Extract Address
+        addr = bytes_from_hex_string(file_json['stealth_address'], 65)
+        out['stealth_address'] = addr
+        out['pub_scan_key'], out['pub_spend_key'] = GetKeysFromStealthAddress(addr)
+
+        #Extract Scan Key
+        if password==None:
+            password = getpass()
+            
+        out['scan_key'] = decode_keyfile_json(file_json['scan_key'], bytes(password, 'utf'))
+        out['spend_key'] = decode_keyfile_json(file_json['scan_key'], bytes(password, 'utf'))
+        del password
+
+    return out

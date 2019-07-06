@@ -1,5 +1,6 @@
 import os
 import json
+from tinydb import TinyDB, Query
 from web3 import Web3, HTTPProvider, WebsocketProvider
 from eth_keyfile import create_keyfile_json
 from stealth_util import *
@@ -26,6 +27,9 @@ if os.path.exists("sync.json"):
     fromBlock = (sync_json["lastBlock"])
 else:
     sync_json = dict()
+
+#Check for previous sync DB
+db = TinyDB("db.json")
     
 #Check events from contract
 block_num = w3.eth.blockNumber
@@ -45,25 +49,36 @@ for event in entries:
     addr_test = GetAddrFromSharedSecret(ss, wallet['pub_spend_key'])
 
     if dest_addr == addr_test:
-        print("HIT!")
-        
-        priv_key = GetPrivKeyFromSharedSecret(ss, wallet['spend_key'])
+        #Check to see if it is in the database
+        tx = Query()
+        results = db.search(tx.address == ("0x" + dest_addr.hex()))
+        if len(results) == 0:
+            print("HIT!")
+            priv_key = GetPrivKeyFromSharedSecret(ss, wallet['spend_key'])
 
-        filename = "Keystore--" + hex(int.from_bytes(addr_test, 'big'))[2:] + ".json"
-            
-        print("Creating " + filename + " ... ", end="")
+            filename = "Keystore--" + hex(int.from_bytes(addr_test, 'big'))[2:] + ".json"
+                
+            print("Creating " + filename + " ... ", end="")
 
-        if password==None:
-            password = getpass()
-            
-        with open(filename, mode='w') as file:
-            js = create_keyfile_json(int.to_bytes(priv_key, 32, 'big'), bytes(password, 'utf'))
-            json.dump(js, file)
+            if password==None:
+                password = getpass()
 
-        print("COMPLETE!")
+            db_entry = dict()
+            db_entry['address'] = "0x" + dest_addr.hex()
+            db_entry['keystore'] = create_keyfile_json(int.to_bytes(priv_key, 32, 'big'), bytes(password, 'utf'))
+            db.insert(db_entry)
+
+            print("COMPLETE!")
+        else:
+            print("DUPLICATE!")
+    else:
+        print("MISS!")
 
 sync_json["lastBlock"] = block_num
 
 #Rewrite Sync File
 with open("sync.json", "w") as f:
     json.dump(sync_json, f)
+
+#Close DB
+db.close()

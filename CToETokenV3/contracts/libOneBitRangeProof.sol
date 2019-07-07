@@ -19,20 +19,25 @@ library OneBitRangeProof {
     }	
 	
 	//High Level Functions
-	function FromBytes(bytes memory b, uint index) internal view returns (Data memory proof) {
-		//b must be 20+128*N or 20+160*N bytes long
-		bool compressed_proof = false;
+	function GetProofCount(bytes memory b) internal pure returns (uint count, bool compressed) {
+	    //b must be 20+128*N or 20+160*N bytes long
 		require(b.length >= 148);
 		
-		uint num_proofs = b.length - 20;
-		if (num_proofs % 128 == 0) {
-		    compressed_proof = true;
-			num_proofs = num_proofs / 128;
+		count = b.length - 20;
+		if (count % 128 == 0) {
+		    compressed = true;
+		    count = count / 128;
 		}
 		else {
-		    require(num_proofs % 160 == 0);
-			num_proofs = num_proofs / 160;
+		    require(count % 160 == 0);
+		    count = count / 160;
 		}
+	}
+	
+	function FromBytes(bytes memory b, uint index) internal view returns (Data memory proof) {
+		uint num_proofs;
+		bool compressed_proof;
+		(num_proofs, compressed_proof) = GetProofCount(b);
 		
 		//Check to see if b is long enough for requested index
 		require(index < num_proofs);
@@ -81,20 +86,9 @@ library OneBitRangeProof {
 	}
 	
 	function FromBytesAll(bytes memory b) internal view returns (Data[] memory proof) {
-		//b must be 20+128*N or 20+160*N bytes long
-		bool compressed_proof = false;
-		require(b.length >= 148);
-		
-		uint num_proofs = b.length - 20;
-		if (num_proofs % 128 == 0) {
-		    compressed_proof = true;
-		    num_proofs = num_proofs / 128;
-			
-		}
-		else {
-		    require(num_proofs % 160 == 0);
-		    num_proofs = num_proofs / 160;
-		}
+		uint num_proofs;
+		bool compressed_proof;
+		(num_proofs, compressed_proof) = GetProofCount(b);
         proof = new Data[](num_proofs);
 		
 		//Load bytes 32 at a time, shift off unused bits

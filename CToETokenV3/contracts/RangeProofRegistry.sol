@@ -107,7 +107,7 @@ contract RangeProofRegistry {
     function FinalizeRangeProofs(bytes memory b) public {
         //Check that proofs are properly formatted
         OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
-        require(proofs.length > 0);        
+        require(proofs.length > 0);
         
         //Check that proof exists
         bytes32 proof_hash = keccak256(abi.encodePacked(b));
@@ -163,21 +163,34 @@ contract RangeProofRegistry {
     
     //Force Proves Range Proofs
     //Do not play bounty game. Verify all range proofs. High gas usage!
-    function ForceProve(bytes memory b) public {
+    function ForceProve(bytes memory b) public returns (uint proven_commitments) {
+        uint proof_count;
+        bool compressed_proof;
+        (proof_count, compressed_proof) = OneBitRangeProof.GetProofCount(b);
+        
         //Check that proofs are properly formatted
-        OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
-        require(proofs.length > 0);
+        require(proof_count > 0);
+        
+        //Get first proof
+        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, 0);
         
         //Check proofs
         uint Hx;
         uint Hy_neg;
-        (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proofs[0].asset_address);
+        (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proof.asset_address);
         
-        for (uint i = 0; i < proofs.length; i++) {
+        for (uint i = 0; i < proof_count; i++)
+        {
+            if (i > 0) {
+                proof = OneBitRangeProof.FromBytes(b, i);
+            }
+            
             //Can pass/fail each one individually since they are verified on-chain
-            if (OneBitRangeProof.Verify(proofs[i], Hx, Hy_neg)) {
-                uint commitment = AltBN128.CompressPoint(proofs[i].Cx, proofs[i].Cy);
+            if (OneBitRangeProof.Verify(proof, Hx, Hy_neg)) {
+                uint commitment = AltBN128.CompressPoint(proof.Cx, proof.Cy);
                 positive_commitments[commitment] = true;
+                proven_commitments++;
+                
                 emit CommitmentPositive(commitment);
             }
         }

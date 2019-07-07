@@ -4,9 +4,9 @@ from random import SystemRandom
 
 #"Private Keys"
 sr = SystemRandom()
-asset_address = 0#0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359 #DAI
+asset_address = 0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359 #DAI
 v = 1
-compress_proof = True
+compress_proof = False
 bf = sr.getrandbits(256)
 
 G1 = bn128.G1
@@ -73,6 +73,7 @@ else:
 #Output
 print("Data:")
 print("0x", end="")
+print(asset_address.to_bytes(20, 'big').hex(), end="")
 
 if compress_proof:
     c_compressed = C[0].n
@@ -89,9 +90,6 @@ else:
 print(c0.to_bytes(32, 'big').hex(), end="")
 print(s0.to_bytes(32, 'big').hex(), end="")
 print(s1.to_bytes(32, 'big').hex())
-
-print()
-print("asset_address: 0x" + asset_address.to_bytes(20, 'big').hex())
 
 
 

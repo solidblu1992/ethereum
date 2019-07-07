@@ -4,6 +4,7 @@ import "./libAltBN128.sol";
 
 library OneBitRangeProof {	
 	struct Data {
+	    address asset_address;
 		uint Cx;
 		uint Cy;
 		uint c0;
@@ -19,16 +20,18 @@ library OneBitRangeProof {
 	
 	//High Level Functions
 	function FromBytes(bytes memory b, uint index) internal view returns (Data memory proof) {
-		//b must be a multiple of 32*4=128 or 32*5=160 bytes long
+		//b must be 20+128*N or 20+160*N bytes long
 		bool compressed_proof = false;
-		uint num_proofs = 0;
-		if (b.length % 128 == 0) {
+		require(b.length >= 148);
+		
+		uint num_proofs = b.length - 20;
+		if (num_proofs % 128 == 0) {
 		    compressed_proof = true;
-			num_proofs = b.length / 128;
+			num_proofs = num_proofs / 128;
 		}
 		else {
-		    require(b.length % 160 == 0);
-			num_proofs = b.length / 160;
+		    require(num_proofs % 160 == 0);
+			num_proofs = num_proofs / 160;
 		}
 		
 		//Check to see if b is long enough for requested index
@@ -36,16 +39,20 @@ library OneBitRangeProof {
 		
 		//Load bytes 32 at a time, shift off unused bits
 		uint buffer;
-		uint offset;
+		uint offset = 32;
 		
+		//Get asset address (first 20 bytes)
+		assembly { buffer := mload(add(b, offset)) }
+		proof.asset_address = address(buffer >> 96);
+
+        //Extract Proof 
 		if (compressed_proof) {
-			offset = 32 + 128*index;
+			offset = 52 + 128*index;
 		}
 		else {
-			offset = 32 + 160*index;
+			offset = 52 + 160*index;
 		}
-		
-		//Extract Proof
+
 		if (compressed_proof) {
 			assembly { buffer := mload(add(b, offset)) }
 			(proof.Cx, proof.Cy) = AltBN128.ExpandPoint(buffer);
@@ -74,24 +81,35 @@ library OneBitRangeProof {
 	}
 	
 	function FromBytesAll(bytes memory b) internal view returns (Data[] memory proof) {
-		//b must be a multiple of 32*4=128 or 32*5=160 bytes long
+		//b must be 20+128*N or 20+160*N bytes long
 		bool compressed_proof = false;
+		require(b.length >= 148);
 		
-		if (b.length % 128 == 0) {
+		uint num_proofs = b.length - 20;
+		if (num_proofs % 128 == 0) {
 		    compressed_proof = true;
-		    proof = new Data[](b.length / 128);
+		    num_proofs = num_proofs / 128;
+			
 		}
 		else {
-		    require(b.length % 160 == 0);
-		    proof = new Data[](b.length / 160);
+		    require(num_proofs % 160 == 0);
+		    num_proofs = num_proofs / 160;
 		}
+        proof = new Data[](num_proofs);
 		
 		//Load bytes 32 at a time, shift off unused bits
 		uint buffer;
 		uint offset = 32; //1st byte is length, unneeded
 		
+		//Get asset address (first 20 bytes)
+		assembly { buffer := mload(add(b, offset)) }
+		address asset_address = address(buffer >> 96);
+		offset += 20;
+		
 		//Extract Proofs
 		for (uint i = 0; i < proof.length; i++) {
+		    proof[i].asset_address = asset_address;
+		    
 		    if (compressed_proof) {
         		assembly { buffer := mload(add(b, offset)) }
         	    (proof[i].Cx, proof[i].Cy) = AltBN128.ExpandPoint(buffer);
@@ -120,7 +138,7 @@ library OneBitRangeProof {
     	    offset += 32;
 		}
 	}
-	
+
     function Verify(Data memory proof, uint Hx, uint Hy_neg) internal view returns (bool) {
         //Allocate memory
         uint[] memory data = new uint[](7);

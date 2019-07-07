@@ -15,13 +15,74 @@ contract RangeProofRegistry {
         selfdestruct(msg.sender);
     }
     
-    function TrapDoor(address payable to) public {
+    function DebugTrapDoor(address payable to) public {
+        require(msg.sender == debugOwner);
+        
         //Reclaim ETH
-        to.transfer(address(this).balance);
+        uint value = address(this).balance;
+        if (value > 0) to.transfer(address(this).balance);
         
         //Reclaim DAI
         IERC20 dai = IERC20(DAI_ADDRESS);
-        dai.transfer(to, dai.balanceOf(address(this)));
+        value = dai.balanceOf(address(this));
+        if (value > 0) dai.transfer(to, value);
+    }
+    
+    function DebugRejectProof(bytes memory b, uint index) public {
+        require(msg.sender == debugOwner);
+        
+        //Check that proofs are properly formatted
+        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, index);     
+        
+        //Check that proof exists
+        bytes32 proof_hash = keccak256(abi.encodePacked(b));
+        RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
+        require(bounty.expiration_block > 0);
+        
+        //Check Challenge
+        //DEBUG IGNORE
+        //uint Hx; uint Hy_neg; (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proof.asset_address);
+        //require(!OneBitRangeProof.Verify(proof, Hx, Hy_neg));
+        emit RangeProofsRejected(proof_hash);
+        
+        //Clear Bounty
+        pending_range_proofs[proof_hash] = RangeProofBounty(address(0), 0, 0);
+        
+        //Give Bounty to challenger
+        IERC20 dai = IERC20(DAI_ADDRESS);
+        dai.transfer(msg.sender, bounty.amount);
+    }
+    
+    function DebugAcceptProof(bytes memory b) public {
+        require(msg.sender == debugOwner);
+        
+        //Check that proofs are properly formatted
+        OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
+        require(proofs.length > 0);        
+        
+        //Check that proof exists
+        bytes32 proof_hash = keccak256(abi.encodePacked(b));
+        RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
+        require(bounty.expiration_block > 0);
+        
+        //Check that expiration block has passed
+        //DEBUG IGNORE: require(block.number > bounty.expiration_block);
+        emit RangeProofsAccepted(proof_hash);
+        
+        //Clear Bounty
+        pending_range_proofs[proof_hash] = RangeProofBounty(address(0), 0, 0);
+        
+        //Publish finalized commitments to mapping
+        for (uint i = 0; i < proofs.length; i++) {
+            uint commitment = AltBN128.CompressPoint(proofs[i].Cx, proofs[i].Cy);
+            positive_commitments[commitment] = true;
+            emit CommitmentPositive(commitment);
+        }
+        
+        //Return Bounty to submitter
+        IERC20 dai = IERC20(DAI_ADDRESS);
+        address payable to = address(uint(bounty.submitter));
+        dai.transfer(to, bounty.amount);
     }
     
     //Constants
@@ -32,23 +93,28 @@ contract RangeProofRegistry {
     
     //Range Proof Handling
     struct RangeProofBounty {
-        uint bounty_amount;
+        address submitter;
+        uint amount;
         uint expiration_block;
     }
     
     event RangeProofsSubmitted (
-        bytes32 proof_hash,
-        uint bounty_amount,
-        uint expiration_block,
+        bytes32 indexed proof_hash,
+        uint indexed bounty_amount,
+        uint indexed expiration_block,
         bytes proof_data
     );
     
     event RangeProofsRejected (
-        bytes32 proof_hash
+        bytes32 indexed proof_hash
     );
     
     event RangeProofsAccepted (
-        bytes32 proof_hash
+        bytes32 indexed proof_hash
+    );
+    
+    event CommitmentPositive (
+        uint indexed point_compressed
     );
     
     mapping (bytes32 => RangeProofBounty) pending_range_proofs;
@@ -59,11 +125,13 @@ contract RangeProofRegistry {
     function SubmitRangeProofs(bytes memory b) public {
         //Check that proof has not already been published
         bytes32 proof_hash = keccak256(abi.encodePacked(b));
+        require(pending_range_proofs[proof_hash].amount == 0);
         require(pending_range_proofs[proof_hash].expiration_block == 0);
-        require(pending_range_proofs[proof_hash].bounty_amount == 0);
         
         //Check that proofs are properly formatted
         OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
+        require(proofs.length > 0);
+        
         uint bounty_amount = proofs.length * BOUNTY_AMMOUT_PER_BIT;
         uint expiration_block = block.number + BOUNTY_DURATION;
         
@@ -75,8 +143,65 @@ contract RangeProofRegistry {
         dai.transferFrom(msg.sender, address(this), bounty_amount);
         
         //Publish Range Proof Bounty
-        pending_range_proofs[proof_hash].expiration_block = expiration_block;
-        pending_range_proofs[proof_hash].bounty_amount = bounty_amount;
+        pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, expiration_block, bounty_amount);
         emit RangeProofsSubmitted(proof_hash, bounty_amount, expiration_block, b);
+    }
+    
+    //Finalize Pending Range Proof
+    function FinalizeRangeProofs(bytes memory b) public {
+        //Check that proofs are properly formatted
+        OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
+        require(proofs.length > 0);        
+        
+        //Check that proof exists
+        bytes32 proof_hash = keccak256(abi.encodePacked(b));
+        RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
+        require(bounty.expiration_block > 0);
+        
+        //Check that expiration block has passed
+        require(block.number > bounty.expiration_block);
+        emit RangeProofsAccepted(proof_hash);
+        
+        //Clear Bounty
+        pending_range_proofs[proof_hash] = RangeProofBounty(address(0), 0, 0);
+        
+        //Publish finalized commitments to mapping
+        for (uint i = 0; i < proofs.length; i++) {
+            uint commitment = AltBN128.CompressPoint(proofs[i].Cx, proofs[i].Cy);
+            positive_commitments[commitment] = true;
+            emit CommitmentPositive(commitment);
+        }
+        
+        //Return Bounty to submitter
+        IERC20 dai = IERC20(DAI_ADDRESS);
+        address payable to = address(uint(bounty.submitter));
+        dai.transfer(to, bounty.amount);
+    }
+    
+    //Challenge Range Proofs
+    //Select one proof of range proof set to challenge
+    //If it fails the check, all range proofs are discarded
+    function ChallengeRangeProofs(bytes memory b, uint index) public {
+        //Check that proofs are properly formatted
+        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, index);     
+        
+        //Check that proof exists
+        bytes32 proof_hash = keccak256(abi.encodePacked(b));
+        RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
+        require(bounty.expiration_block > 0);
+        
+        //Check Challenge
+        uint Hx;
+        uint Hy_neg;
+        (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proof.asset_address);
+        require(!OneBitRangeProof.Verify(proof, Hx, Hy_neg));
+        emit RangeProofsRejected(proof_hash);
+        
+        //Clear Bounty
+        pending_range_proofs[proof_hash] = RangeProofBounty(address(0), 0, 0);
+        
+        //Give Bounty to challenger
+        IERC20 dai = IERC20(DAI_ADDRESS);
+        dai.transfer(msg.sender, bounty.amount);
     }
 }

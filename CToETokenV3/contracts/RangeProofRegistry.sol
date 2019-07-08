@@ -254,5 +254,8 @@ contract RangeProofRegistry {
 			//Add
 			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, Px[i], Py[i]);
 		}
+		
+		//Compress Commitment and Mark as Positive
+		large_commitments[AltBN128.CompressPoint(Cx, Cy)] = true;
 	}
 }

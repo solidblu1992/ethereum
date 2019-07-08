@@ -27,6 +27,11 @@ library AltBN128 {
 	    return (1, 2);
 	}
 	
+	//Checks to see if point is zero
+	function IsZero(uint Px, uint Py) internal pure returns (bool) {
+	    return (Px == 0 && Py == 0);
+	}
+	
 	function CompressPoint(uint Px, uint Py) internal pure returns (uint x_compressed) {
 	    x_compressed = Px;
         
@@ -59,6 +64,29 @@ library AltBN128 {
             }
         }
     }
+	
+	//Calculates G1 Point addition using precompile
+	function AddPoints(uint Ax, uint Ay, uint Bx, uint By) internal view returns (uint Cx, uint Cy)	{
+	    //Trivial Cases, no precompile call required
+	    if (IsZero(A)) return (Bx, By);
+	    if (IsZero(B)) return (Ax, Ay);
+	    
+	    uint[] memory data = new uint[](4);
+	    data[0] = Ax;
+	    data[1] = Ay;
+	    data[2] = Bx;
+	    data[3] = By;
+	    
+	    assembly {
+	        //Call ECAdd
+        	let success := staticcall(sub(gas, 2000), 0x06, add(data, 0x20), 0x80, add(data, 0x20), 0x40)
+       	 
+        	// Use "invalid" to make gas estimation work
+         	switch success case 0 { revert(data, 0x80) }
+	    }
+	    
+	    (Cx, Cy) = (data[0], data[1]);
+	}
 	
 	//Check to see if G1Point is on curve
 	function IsOnCurve(uint Px, uint Py) internal pure returns (bool) {

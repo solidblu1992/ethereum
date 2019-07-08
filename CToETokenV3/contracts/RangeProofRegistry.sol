@@ -60,19 +60,32 @@ contract RangeProofRegistry {
         uint indexed point_compressed
     );
     
+	//Pending Range Proofs, may finalize into 1-bit commitments
     mapping (bytes32 => RangeProofBounty) pending_range_proofs;
-    mapping (uint => bool) positive_commitments;
+	
+	//Positive Commitments
+	//Pure single-asset one-bit commitments
+    mapping (uint => bool) one_bit_commitments;
+	//Combination of one-bit commitments of multiple assets
+	mapping (uint => bool) composite_commitments;
+	//Built from double and add combinations of one-bit commitments
+	mapping (uint => bool) large_commitments;
     
     //Verifies that all commitments have been proven positive
     function IsPositive(uint commitment) public view returns (bool) {
-        return positive_commitments[commitment];    
+		if (one_bit_commitments[commitment]) return true;
+		if (composite_commitments[commitment]) return true;
+		if (large_commitments[commitment]) return true;
+		
+		return false;
     }
     
     function AreAllPositive(uint[] memory commitments) public view returns (bool) {
         for (uint i = 0; i < commitments.length; i++) {
-            if (!positive_commitments[commitments[i]]) return false;
+			if (!IsPositive(commitments[i])) {
+				return false;
+			}
         }
-        
         return true;
     }
     
@@ -102,6 +115,15 @@ contract RangeProofRegistry {
         pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block);
         emit RangeProofsSubmitted(proof_hash, bounty_amount, expiration_block, b);
     }
+	
+	//Return status of range proof
+	function GetRangeProofInfo(bytes32 proof_hash)
+		public view returns (address submitter, uint amount, uint expiration_block)
+	{
+		submitter = pending_range_proofs[proof_hash].submitter;
+		amount = pending_range_proofs[proof_hash].amount;
+		expiration_block = pending_range_proofs[proof_hash].expiration_block;
+	}
     
     //Finalize Pending Range Proof
     function FinalizeRangeProofs(bytes memory b) public {
@@ -195,4 +217,62 @@ contract RangeProofRegistry {
             }
         }
     }
+
+	//Mix one-bit commitments
+	function MixOneBitCommitments(uint Ax, uint Ay, uint Bx, uint By) public return (uint Cx, uint Cy) {
+		//Each commitment must be pure one-bit
+		if (!one_bit_commitments[CompressPoint(Ax, Ay)]) return (0, 0);
+		if (!one_bit_commitments[CompressPoint(Bx, By)]) return (0, 0);
+		
+		//Calculate new commitment
+		(Cx, Cy) = AltBN128.AddPoints(Ax, Ay, Bx, By);
+		if (AltBN128.IsZero(Cx, Cy)) return 0;
+		
+		//Compress Commitment and Mark as Positive
+		composite_commitments[AltBN128.CompressPoint(Cx, Cy)] = true;
+	}
+
+	//Build large commitments
+	function BuildCommitment(uint[] memory Px, uint[] memory Py) public return (uint Cx, uint Cy) {
+		//Only allow 64-bit commitments or less
+		if (Px.length > 64) return (0, 0);
+		if (Py.length != Px.length) return (0, 0);
+		
+		//Use Double and Add
+		for (uint i = 0; i < Px.length; i++) {
+			//Double
+			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, Cx, Cy);
+			
+			//Verify that input commitment is proven positive
+			uint compressed = AltBN128.CompressPoint(Px[i], Py[i]);
+			if (!one_bit_commitments[compressed]) {
+				if (!composite_commitments[compressed]) {
+					return (0, 0);
+				}
+			}
+			
+			//Add
+			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, Px[i], Py[i]);
+		}
+	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -154,8 +154,11 @@ contract RangeProofRegistry {
         
         //Publish finalized commitments to mapping
         for (uint i = 0; i < bounty.commitments.length; i++) {
-            one_bit_commitments[bounty.commitments[i]] = true;
-            emit CommitmentPositive(bounty.commitments[i]);
+			//If already positive, skip
+			if (!one_bit_commitments[bounty.commitments[i]]) {
+				one_bit_commitments[bounty.commitments[i]] = true;
+				emit CommitmentPositive(bounty.commitments[i]);
+			}
         }
         
         //Return Bounty to submitter

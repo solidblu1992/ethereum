@@ -1,0 +1,11 @@
+//Submission
+64 bits = 4,637,051 gas (75,000 per bit)
+https://goerli.etherscan.io/tx/0x589fd621405611598bc328995e7d0af4a3fc892c935de55f9d87dc6c2dcab65f
+
+//Challenge
+64 bits = 712,521 gas (11,133
+https://goerli.etherscan.io/tx/0xa034d92344b8710e1cbcbf5ed538b58a2a7a44c3f6fb95d28ab97abb3ec09e43
+
+//Finalization
+64 bits = 1,110,076 gas (17,500 per bit)
+https://goerli.etherscan.io/tx/0xed6d22133ee1bb68703b1ad8c4c268cd53057020b1ca4daeaa8758df100470b3

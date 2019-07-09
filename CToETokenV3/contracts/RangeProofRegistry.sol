@@ -126,7 +126,7 @@ contract RangeProofRegistry {
         }
         
         //Publish Range Proof Bounty
-        pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block);
+        pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block, commitments);
         emit RangeProofsSubmitted(proof_hash, bounty_amount, expiration_block, b);
     }
 	
@@ -154,8 +154,8 @@ contract RangeProofRegistry {
         
         //Publish finalized commitments to mapping
         for (uint i = 0; i < bounty.commitments.length; i++) {
-            one_bit_commitments[bounty.commitments[0]] = true;
-            emit CommitmentPositive(bounty.commitments[0]);
+            one_bit_commitments[bounty.commitments[i]] = true;
+            emit CommitmentPositive(bounty.commitments[i]);
         }
         
         //Return Bounty to submitter
@@ -221,7 +221,7 @@ contract RangeProofRegistry {
 		
 		//Calculate new commitment
 		(Cx, Cy) = AltBN128.AddPoints(Ax, Ay, Bx, By);
-		if (AltBN128.IsZero(Cx, Cy)) return 0;
+		if (AltBN128.IsZero(Cx, Cy)) return (0, 0);
 		
 		//Compress Commitment and Mark as Positive
 		composite_commitments[AltBN128.CompressPoint(Cx, Cy)] = true;

@@ -17,11 +17,17 @@ def H_from_address(address):
 
     return (x, y)
 
-def GenerateOneBitRangeProofs(count=16, asset_address=0x0000000000000000000000000000000000000000, compress_proofs=False):
+def GenerateOneBitRangeProofs(count=16, asset_address=0x0000000000000000000000000000000000000000, compress_proofs=False, print_proof=False):
     sr = SystemRandom()
 
     #Pick values and blinding factors
-    private_commitments = [(sr.randint(0, 1), sr.getrandbits(256)) for i in range(0, count)]
+    #Pick equal number of each
+    pc = [(sr.randint(0, 1), sr.getrandbits(256)) for i in range(0, count // 2)]
+    pcp = [(1 - pc[i][0], sr.getrandbits(256)) for i in range(0, count // 2)]
+    private_commitments = pc + pcp
+
+    if (count % 1 == 1):
+        private_commitments += (sr.randint(0, 1), sr.getrandbits(256))
 
     #Get generator points
     G1 = bn128.G1
@@ -89,10 +95,15 @@ def GenerateOneBitRangeProofs(count=16, asset_address=0x000000000000000000000000
         proofs += s0.to_bytes(32, 'big')
         proofs += s1.to_bytes(32, 'big')
 
-    print("Proof:")
-    print("0x", proofs.hex())
+    if (print_proof):
+        print("Proof:")
+        print("0x" + proofs.hex())
 
     return private_commitments, proofs
+
+def Hash_Range_Proof(proof_bytes):
+    h = keccak_256(proof_bytes)
+    return "0x" + h.hexdigest()
 
 if __name__ == "__main__":
     private_commitments, proofs = GenerateOneBitRangeProofs(count=3)

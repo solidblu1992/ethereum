@@ -154,7 +154,7 @@ contract RangeProofRegistry {
         
         //Publish finalized commitments to mapping
         for (uint i = 0; i < bounty.commitments.length; i++) {
-            positive_commitments[bounty.commitments[0]] = true;
+            one_bit_commitments[bounty.commitments[0]] = true;
             emit CommitmentPositive(bounty.commitments[0]);
         }
         
@@ -204,7 +204,7 @@ contract RangeProofRegistry {
         
         if (OneBitRangeProof.Verify(proof, Hx, Hy_neg)) {
             uint commitment = AltBN128.CompressPoint(proof.Cx, proof.Cy);
-            positive_commitments[commitment] = true;
+            one_bit_commitments[commitment] = true;
             emit CommitmentPositive(commitment);
             return true;
         }
@@ -214,10 +214,10 @@ contract RangeProofRegistry {
     }
 
 	//Mix one-bit commitments
-	function MixOneBitCommitments(uint Ax, uint Ay, uint Bx, uint By) public return (uint Cx, uint Cy) {
+	function MixOneBitCommitments(uint Ax, uint Ay, uint Bx, uint By) public returns (uint Cx, uint Cy) {
 		//Each commitment must be pure one-bit
-		if (!one_bit_commitments[CompressPoint(Ax, Ay)]) return (0, 0);
-		if (!one_bit_commitments[CompressPoint(Bx, By)]) return (0, 0);
+		if (!one_bit_commitments[AltBN128.CompressPoint(Ax, Ay)]) return (0, 0);
+		if (!one_bit_commitments[AltBN128.CompressPoint(Bx, By)]) return (0, 0);
 		
 		//Calculate new commitment
 		(Cx, Cy) = AltBN128.AddPoints(Ax, Ay, Bx, By);
@@ -228,7 +228,7 @@ contract RangeProofRegistry {
 	}
 
 	//Build large commitments
-	function BuildCommitment(uint[] memory Px, uint[] memory Py) public view return (uint Cx, uint Cy) {
+	function BuildCommitment(uint[] memory Px, uint[] memory Py) public view returns (uint Cx, uint Cy) {
 		//Only allow 64-bit commitments or less
 		if (Px.length > 64) return (0, 0);
 		if (Py.length != Px.length) return (0, 0);
@@ -251,7 +251,7 @@ contract RangeProofRegistry {
 		}
 	}
 	
-	function StoreLargeCommitment(uint[] memory Px, uint[] memory Py) public return (uint Cx, uint Cy) {
+	function StoreLargeCommitment(uint[] memory Px, uint[] memory Py) public {
 		//Build Commitment
 		uint Cx;
 		uint Cy;

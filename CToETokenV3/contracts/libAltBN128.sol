@@ -68,8 +68,8 @@ library AltBN128 {
 	//Calculates G1 Point addition using precompile
 	function AddPoints(uint Ax, uint Ay, uint Bx, uint By) internal view returns (uint Cx, uint Cy)	{
 	    //Trivial Cases, no precompile call required
-	    if (IsZero(A)) return (Bx, By);
-	    if (IsZero(B)) return (Ax, Ay);
+	    if (IsZero(Ax, Ay)) return (Bx, By);
+	    if (IsZero(Bx, By)) return (Ax, Ay);
 	    
 	    uint[] memory data = new uint[](4);
 	    data[0] = Ax;

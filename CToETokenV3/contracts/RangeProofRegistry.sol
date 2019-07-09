@@ -12,25 +12,19 @@ contract RangeProofRegistry {
     
     function DebugKill() public {
         require(msg.sender == debugOwner);
-        selfdestruct(msg.sender);
-    }
-    
-    function DebugTrapDoor(address payable to) public {
-        require(msg.sender == debugOwner);
-        
-        //Reclaim ETH
-        uint value = address(this).balance;
-        if (value > 0) to.transfer(address(this).balance);
         
         //Reclaim DAI
         IERC20 dai = IERC20(DAI_ADDRESS);
-        value = dai.balanceOf(address(this));
-        if (value > 0) dai.transfer(to, value);
+        uint value = dai.balanceOf(address(this));
+        if (value > 0) dai.transfer(msg.sender, value);
+        
+        //Reclaim ETH and destroy contract
+        selfdestruct(msg.sender);
     }
     
     //Constants
-    uint constant BOUNTY_DURATION = 1;                                              //40000 blocks = 1 week
-    uint constant BOUNTY_AMOUNT_PER_BIT = 250000000000000000;                       //0.25 DAI
+    uint constant BOUNTY_DURATION = 20;                                             //40000 blocks = 1 week
+    uint constant BOUNTY_AMOUNT_PER_BIT = 500000000000000000;                       //0.25 DAI
     //address constant DAI_ADDRESS = 0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359;    //Mainnet DAI v1.0
     address constant DAI_ADDRESS = 0xfBdB3f7db18cb66327279DD3Ab86154aa66Ab95C;      //Testnet Token
     
@@ -39,6 +33,7 @@ contract RangeProofRegistry {
         address submitter;
         uint amount;
         uint expiration_block;
+        uint[] commitments;
     }
     
     event RangeProofsSubmitted (
@@ -70,6 +65,20 @@ contract RangeProofRegistry {
 	mapping (uint => bool) composite_commitments;
 	//Built from double and add combinations of one-bit commitments
 	mapping (uint => bool) large_commitments;
+	
+    //Data structure Helper Functions
+    function GetBlankBounty() internal pure returns (RangeProofBounty memory bounty) {
+        return RangeProofBounty(address(0), 0, 0, new uint[](0));
+    }
+    
+    function IsBlankBounty(RangeProofBounty memory bounty) internal pure returns (bool) {
+        if (bounty.submitter != address(0)) return false;
+        if (bounty.amount != 0) return false;
+        if (bounty.expiration_block != 0) return false;
+        if (bounty.commitments.length > 0) return false;
+        
+        return true;
+    }
     
     //Verifies that all commitments have been proven positive
     function IsPositive(uint commitment) public view returns (bool) {
@@ -94,8 +103,7 @@ contract RangeProofRegistry {
     function SubmitRangeProofs(bytes memory b) public {
         //Check that proof has not already been published
         bytes32 proof_hash = keccak256(abi.encodePacked(b));
-        require(pending_range_proofs[proof_hash].amount == 0);
-        require(pending_range_proofs[proof_hash].expiration_block == 0);
+        require(IsBlankBounty(pending_range_proofs[proof_hash]));
         
         //Check that proofs are properly formatted
         OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
@@ -110,6 +118,12 @@ contract RangeProofRegistry {
         
         //Transfer DAI bounty
         dai.transferFrom(msg.sender, address(this), bounty_amount);
+        
+        //Fetch Commitments
+        uint[] memory commitments = new uint[](proofs.length);
+        for (uint i = 0; i < proofs.length; i++) {
+            commitments[i] = AltBN128.CompressPoint(proofs[i].Cx, proofs[i].Cy);
+        }
         
         //Publish Range Proof Bounty
         pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block);
@@ -126,28 +140,22 @@ contract RangeProofRegistry {
 	}
     
     //Finalize Pending Range Proof
-    function FinalizeRangeProofs(bytes memory b) public {
-        //Check that proofs are properly formatted
-        OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
-        require(proofs.length > 0);
-        
+    function FinalizeRangeProofs(bytes32 proof_hash) public {
         //Check that proof exists
-        bytes32 proof_hash = keccak256(abi.encodePacked(b));
         RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
-        require(bounty.expiration_block > 0);
+        require(!IsBlankBounty(bounty));
         
         //Check that expiration block has passed
         require(block.number > bounty.expiration_block);
         emit RangeProofsAccepted(proof_hash);
         
         //Clear Bounty
-        pending_range_proofs[proof_hash] = RangeProofBounty(address(0), 0, 0);
+        pending_range_proofs[proof_hash] = GetBlankBounty();
         
         //Publish finalized commitments to mapping
-        for (uint i = 0; i < proofs.length; i++) {
-            uint commitment = AltBN128.CompressPoint(proofs[i].Cx, proofs[i].Cy);
-            positive_commitments[commitment] = true;
-            emit CommitmentPositive(commitment);
+        for (uint i = 0; i < bounty.commitments.length; i++) {
+            positive_commitments[bounty.commitments[0]] = true;
+            emit CommitmentPositive(bounty.commitments[0]);
         }
         
         //Return Bounty to submitter
@@ -176,45 +184,32 @@ contract RangeProofRegistry {
         emit RangeProofsRejected(proof_hash);
         
         //Clear Bounty
-        pending_range_proofs[proof_hash] = RangeProofBounty(address(0), 0, 0);
+        pending_range_proofs[proof_hash] = GetBlankBounty();
         
         //Give Bounty to challenger
         IERC20 dai = IERC20(DAI_ADDRESS);
         dai.transfer(msg.sender, bounty.amount);
     }
     
-    //Force Proves Range Proofs
-    //Do not play bounty game. Verify all range proofs. High gas usage!
-    function ForceProve(bytes memory b) public returns (uint proven_commitments) {
-        uint proof_count;
-        bool compressed_proof;
-        (proof_count, compressed_proof) = OneBitRangeProof.GetProofCount(b);
-        
-        //Check that proofs are properly formatted
-        require(proof_count > 0);
-        
+    //Force Prove Range Proof
+    //Do not play bounty game. Verify all range proofs. High overall gas usage!
+    function ForceProve(bytes memory b, uint index) public returns (bool) {
         //Get first proof
-        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, 0);
+        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, index);
         
-        //Check proofs
+        //Check proof
         uint Hx;
         uint Hy_neg;
         (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proof.asset_address);
         
-        for (uint i = 0; i < proof_count; i++)
-        {
-            if (i > 0) {
-                proof = OneBitRangeProof.FromBytes(b, i);
-            }
-            
-            //Can pass/fail each one individually since they are verified on-chain
-            if (OneBitRangeProof.Verify(proof, Hx, Hy_neg)) {
-                uint commitment = AltBN128.CompressPoint(proof.Cx, proof.Cy);
-                positive_commitments[commitment] = true;
-                proven_commitments++;
-                
-                emit CommitmentPositive(commitment);
-            }
+        if (OneBitRangeProof.Verify(proof, Hx, Hy_neg)) {
+            uint commitment = AltBN128.CompressPoint(proof.Cx, proof.Cy);
+            positive_commitments[commitment] = true;
+            emit CommitmentPositive(commitment);
+            return true;
+        }
+        else {
+            return false;
         }
     }
 
@@ -233,7 +228,7 @@ contract RangeProofRegistry {
 	}
 
 	//Build large commitments
-	function BuildCommitment(uint[] memory Px, uint[] memory Py) public return (uint Cx, uint Cy) {
+	function BuildCommitment(uint[] memory Px, uint[] memory Py) public view return (uint Cx, uint Cy) {
 		//Only allow 64-bit commitments or less
 		if (Px.length > 64) return (0, 0);
 		if (Py.length != Px.length) return (0, 0);
@@ -254,6 +249,13 @@ contract RangeProofRegistry {
 			//Add
 			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, Px[i], Py[i]);
 		}
+	}
+	
+	function StoreLargeCommitment(uint[] memory Px, uint[] memory Py) public return (uint Cx, uint Cy) {
+		//Build Commitment
+		uint Cx;
+		uint Cy;
+		(Cx, Cy) = BuildCommitment(Px, Py);
 		
 		//Compress Commitment and Mark as Positive
 		large_commitments[AltBN128.CompressPoint(Cx, Cy)] = true;

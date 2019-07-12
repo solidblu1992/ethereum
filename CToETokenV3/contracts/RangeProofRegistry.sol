@@ -154,11 +154,8 @@ contract RangeProofRegistry {
         
         //Publish finalized commitments to mapping
         for (uint i = 0; i < bounty.commitments.length; i++) {
-			//If already positive, skip
-			if (!one_bit_commitments[bounty.commitments[i]]) {
-				one_bit_commitments[bounty.commitments[i]] = true;
-				emit CommitmentPositive(bounty.commitments[i]);
-			}
+            one_bit_commitments[bounty.commitments[i]] = true;
+            emit CommitmentPositive(bounty.commitments[i]);
         }
         
         //Return Bounty to submitter
@@ -170,12 +167,14 @@ contract RangeProofRegistry {
     //Challenge Range Proofs
     //Select one proof of range proof set to challenge
     //If it fails the check, all range proofs are discarded
-    function ChallengeRangeProofs(bytes memory b, uint index) public {
-        //Check that proofs are properly formatted
-        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, index);     
+    function ChallengeRangeProofs(bytes memory b, bytes32[] memory merkel_hashes, uint index) public {
+        //Fetch proof
+        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, 0);
+        
+        //Get resulting hash from merkel proof
+        bytes32 proof_hash = OneBitRangeProof.GetExpectedHash(proof, merkel_hashes, index);
         
         //Check that proof exists
-        bytes32 proof_hash = keccak256(abi.encodePacked(b));
         RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
         require(bounty.expiration_block > 0);
         

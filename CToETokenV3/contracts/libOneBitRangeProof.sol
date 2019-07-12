@@ -1,6 +1,7 @@
 pragma solidity ^0.5.9;
 
 import "./libAltBN128.sol";
+import "./libMerkel.sol";
 
 library OneBitRangeProof {	
 	struct Data {
@@ -19,25 +20,18 @@ library OneBitRangeProof {
     }	
 	
 	//High Level Functions
-	function GetProofCount(bytes memory b) internal pure returns (uint count, bool compressed) {
-	    //b must be 20+128*N or 20+160*N bytes long
-		require(b.length >= 148);
+	function GetProofCount(bytes memory b) internal pure returns (uint count) {
+	    //b must be 20+160*N bytes long
+		require(b.length >= 180);
 		
 		count = b.length - 20;
-		if (count % 128 == 0) {
-		    compressed = true;
-		    count = count / 128;
-		}
-		else {
-		    require(count % 160 == 0);
-		    count = count / 160;
-		}
+		require(count % 160 == 0);
+		count = count / 160;
 	}
 	
-	function FromBytes(bytes memory b, uint index) internal view returns (Data memory proof) {
+	function FromBytes(bytes memory b, uint index) internal pure returns (Data memory proof) {
 		uint num_proofs;
-		bool compressed_proof;
-		(num_proofs, compressed_proof) = GetProofCount(b);
+		num_proofs = GetProofCount(b);
 		
 		//Check to see if b is long enough for requested index
 		require(index < num_proofs);
@@ -51,27 +45,15 @@ library OneBitRangeProof {
 		proof.asset_address = address(buffer >> 96);
 
         //Extract Proof 
-		if (compressed_proof) {
-			offset = 52 + 128*index;
-		}
-		else {
-			offset = 52 + 160*index;
-		}
+		offset = 52 + 160*index;
 
-		if (compressed_proof) {
-			assembly { buffer := mload(add(b, offset)) }
-			(proof.Cx, proof.Cy) = AltBN128.ExpandPoint(buffer);
-			offset += 32;
-		}
-		else {
-			assembly { buffer := mload(add(b, offset)) }
-			proof.Cx = buffer;
-			offset += 32;
+		assembly { buffer := mload(add(b, offset)) }
+		proof.Cx = buffer;
+		offset += 32;
 			
-			assembly { buffer := mload(add(b, offset)) }
-			proof.Cy = buffer;
-			offset += 32;
-		}
+		assembly { buffer := mload(add(b, offset)) }
+		proof.Cy = buffer;
+		offset += 32;
 		
 		assembly { buffer := mload(add(b, offset)) }
 		proof.c0 = buffer;
@@ -85,10 +67,9 @@ library OneBitRangeProof {
 		proof.s1 = buffer;
 	}
 	
-	function FromBytesAll(bytes memory b) internal view returns (Data[] memory proof) {
+	function FromBytesAll(bytes memory b) internal pure returns (Data[] memory proof) {
 		uint num_proofs;
-		bool compressed_proof;
-		(num_proofs, compressed_proof) = GetProofCount(b);
+		num_proofs = GetProofCount(b);
         proof = new Data[](num_proofs);
 		
 		//Load bytes 32 at a time, shift off unused bits
@@ -104,20 +85,13 @@ library OneBitRangeProof {
 		for (uint i = 0; i < proof.length; i++) {
 		    proof[i].asset_address = asset_address;
 		    
-		    if (compressed_proof) {
-        		assembly { buffer := mload(add(b, offset)) }
-        	    (proof[i].Cx, proof[i].Cy) = AltBN128.ExpandPoint(buffer);
-        	    offset += 32;
-		    }
-		    else {
-		        assembly { buffer := mload(add(b, offset)) }
-        	    proof[i].Cx = buffer;
-        	    offset += 32;
+		    assembly { buffer := mload(add(b, offset)) }
+        	proof[i].Cx = buffer;
+        	offset += 32;
         	    
-        	    assembly { buffer := mload(add(b, offset)) }
-        	    proof[i].Cy = buffer;
-        	    offset += 32;
-		    }
+        	assembly { buffer := mload(add(b, offset)) }
+        	proof[i].Cy = buffer;
+        	offset += 32;
     	    
     		assembly { buffer := mload(add(b, offset)) }
     	    proof[i].c0 = buffer;
@@ -209,5 +183,35 @@ library OneBitRangeProof {
          
          //Check for ring continuity
          return(data[2] == proof.c0);
+    }
+
+    function Hash(bytes memory b) internal pure returns (bytes32 hash) {
+        //Fetch Proofs
+        Data[] memory proofs = FromBytesAll(b);
+		require(proofs.length > 0);
+		
+		//Calculate proof hashes
+		bytes32[] memory proof_hashes = new bytes32[](proofs.length);
+		
+		for (uint i = 0; i < proof_hashes.length; i++) {
+            hash = keccak256(abi.encodePacked(proofs[i].Cx, proofs[i].Cy, proofs[i].c0, proofs[i].s0, proofs[i].s1));
+		}
+		
+		//Create Merkel Tree out of Proofs
+		hash = Merkel.CreateRecursive(proof_hashes, 0, proofs.length);
+		
+		//Add asset address to hash
+		hash = keccak256(abi.encodePacked(proofs[0].asset_address, hash));
+    }
+    
+    function GetExpectedHash(Data memory proof, bytes32[] memory hashes, uint index) internal pure returns (bytes32 hash) {
+        //Get hash of single proof, don't hash asset_address
+        hash = keccak256(abi.encodePacked(proof.Cx, proof.Cy, proof.c0, proof.s0, proof.s1));
+        
+        //Check merkel proof
+        hash = Merkel.GetExpectedRoot2N(hash, hashes, index);
+        
+        //Hash in asset address
+        hash = keccak256(abi.encodePacked(proof.asset_address, hash));
     }
 }

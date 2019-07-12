@@ -123,7 +123,7 @@ def GetProofSizeAndCount(proof_bytes):
 def RecursiveMerkel(hashes):
     length = len(hashes)
     if length == 1:
-        return hashes
+        return hashes[0]
     elif length == 2:
         return keccak_256(hashes[0] + hashes[1]).digest()
     elif length == 3:
@@ -200,7 +200,7 @@ def CheckMerkelProof(merkel_proof):
     return "0x" + final_hash.hex()
 
 if __name__ == "__main__":
-    proof_count = 32
+    proof_count = 1
     private_commitments, proofs = GenerateOneBitRangeProofs(asset_address=0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359, count=proof_count)
     
     proof_hash = MerkelizeRangeProofs(proofs)

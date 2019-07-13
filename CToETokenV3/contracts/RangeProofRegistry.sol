@@ -1,4 +1,4 @@
-pragma solidity ^0.5.9;
+pragma solidity ^0.5.10;
 
 import "./libOneBitRangeProof.sol";
 import "./libCommitments.sol";
@@ -103,7 +103,7 @@ contract RangeProofRegistry {
     //If unchallenged for 1 week, they are assumed to be commitments to valid bits (0 or 1)
     function SubmitRangeProofs(bytes memory b) public {
         //Check that proof has not already been published
-        bytes32 proof_hash = keccak256(abi.encodePacked(b));
+        bytes32 proof_hash = OneBitRangeProof.Hash(b);
         require(IsBlankBounty(pending_range_proofs[proof_hash]));
         
         //Check that proofs are properly formatted
@@ -254,7 +254,9 @@ contract RangeProofRegistry {
 	}
 
 	//Build large commitments
-	function BuildCommitment(bytes memory b, uint8[] memory indices) public view returns (uint Cx, uint Cy) {
+	function BuildCommitment(bytes memory b, uint8[] memory indices)
+	    public view returns (uint Cx, uint Cy)
+	{
 		//Unpack commitments
 	    Commitments.Data[] memory commitments = Commitments.FromBytes(b);
 		
@@ -275,5 +277,59 @@ contract RangeProofRegistry {
 			//Add
 			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, commitments[index].x, commitments[index].y);
 		}
+	}
+	
+	function BuildCommitment2(bytes memory b, uint8[] memory indices0, uint8[] memory indices1)
+	    public view returns (uint Ax, uint Ay, uint Bx, uint By)
+    {
+        //Build two commitments with one call
+        (Ax, Ay) = BuildCommitment(b, indices0);
+        (Bx, By) = BuildCommitment(b, indices1);
+    }
+    
+	//Storage for built commitments
+	mapping (uint => bool) commitment_storage;
+    
+    //Store large commitments
+    function BuildAndStore(bytes memory b, uint8[] memory indices) public {
+        //Build commitments
+	    uint Cx;
+	    uint Cy;
+	    (Cx, Cy) = BuildCommitment(b, indices);
+	    
+	    //Check for success
+	    if (!AltBN128.IsZero(Cx, Cy)) {
+	        //Compress Commitment
+	        Cx = AltBN128.CompressPoint(Cx, Cy);
+	        
+	        //Store Commitment
+	        commitment_storage[Cx] = true;
+	    }
+	}
+	
+    function BuildAndStore2(bytes memory b, uint8[] memory indices0, uint8[] memory indices1) public {
+        //Build commitments
+	    uint Ax;
+	    uint Ay;
+	    uint Bx;
+	    uint By;
+	    (Ax, Ay, Bx, By) = BuildCommitment2(b, indices0, indices1);
+	    
+	    //Check for successes
+	    if (!AltBN128.IsZero(Ax, Ay)) {
+	        //Compress Commitment
+	        Ax = AltBN128.CompressPoint(Ax, Ay);
+	        
+	        //Store Commitment
+	        commitment_storage[Ax] = true;
+	    }
+	    
+	    if (!AltBN128.IsZero(Bx, By)) {
+	        //Compress Commitment
+	        Bx = AltBN128.CompressPoint(Bx, By);
+	        
+	        //Store Commitment
+	        commitment_storage[Bx] = true;
+	    }
 	}
 }

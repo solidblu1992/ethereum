@@ -194,7 +194,7 @@ library OneBitRangeProof {
 		bytes32[] memory proof_hashes = new bytes32[](proofs.length);
 		
 		for (uint i = 0; i < proof_hashes.length; i++) {
-            hash = keccak256(abi.encodePacked(proofs[i].Cx, proofs[i].Cy, proofs[i].c0, proofs[i].s0, proofs[i].s1));
+            proof_hashes[i] = keccak256(abi.encodePacked(proofs[i].Cx, proofs[i].Cy, proofs[i].c0, proofs[i].s0, proofs[i].s1));
 		}
 		
 		//Create Merkel Tree out of Proofs

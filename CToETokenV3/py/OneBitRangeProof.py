@@ -22,6 +22,14 @@ def H_from_address(address):
 
     return (x, y)
 
+def GetProofSizeAndCount(proof_bytes):
+    #Only accept uncompressed proofs
+    proof_size = 160
+    proof_count = len(proof_bytes)-20
+    assert(proof_count % proof_size == 0)
+    proof_count = proof_count // 160
+    return proof_size, proof_count
+
 def GenerateOneBitRangeProofs(count=16, asset_address=0x0000000000000000000000000000000000000000, compress_proofs=False, print_proof=False):
     sr = SystemRandom()
 
@@ -112,13 +120,17 @@ def GenerateOneBitRangeProofs(count=16, asset_address=0x000000000000000000000000
 
     return private_commitments, proofs
 
-def GetProofSizeAndCount(proof_bytes):
-    #Only accept uncompressed proofs
-    proof_size = 160
-    proof_count = len(proof_bytes)-20
-    assert(proof_count % proof_size == 0)
-    proof_count = proof_count // 160
-    return proof_size, proof_count
+def ExtractProof(proof_bytes, i):
+    proof_size, proof_count = GetProofSizeAndCount(proof_bytes)
+    assert(i < proof_count)
+
+    #Store asset address
+    out = proof_bytes[0:20]
+
+    #Fetch proof
+    out += proof_bytes[20+i*proof_size:20+(i+1)*proof_size]
+
+    return out
 
 def RecursiveMerkel(hashes):
     length = len(hashes)
@@ -140,7 +152,7 @@ def MerkelizeRangeProofs(proof_bytes):
     assert(IsPowerOf2(proof_count))
 
     #Merkelize range proofs
-    proof_hashes = [keccak_256(proof_bytes[20+i:21+i+proof_size]).digest() for i in range(0, proof_count)]
+    proof_hashes = [keccak_256(proof_bytes[20+i*proof_size:20+(i+1)*proof_size]).digest() for i in range(0, proof_count)]
     merkel_root = RecursiveMerkel(proof_hashes)
 
     #Hash in asset address
@@ -157,7 +169,7 @@ def GetMerkelProof(proof_bytes, index):
     assert(index < proof_count)
 
     #Merkelize range proofs
-    merkel_row = [keccak_256(proof_bytes[20+i:21+i+proof_size]).digest() for i in range(0, proof_count)]
+    merkel_row = [keccak_256(proof_bytes[20+i*proof_size:20+(i+1)*proof_size]).digest() for i in range(0, proof_count)]
     proof_hash = merkel_row[index]
 
     #Build merkel tree
@@ -199,16 +211,34 @@ def CheckMerkelProof(merkel_proof):
     final_hash = keccak_256(asset_addr + final_hash).digest()
     return "0x" + final_hash.hex()
 
+def PrintMerkelProof(range_proof, index):
+    #Print out single merkel proof for solidity
+    mp = GetMerkelProof(range_proof, index)
+    rp = ExtractProof(range_proof, index)
+
+    print("Merkel Proof")
+    print("0x" + rp.hex() + ",", end="")
+
+    print("[", end="")
+    for i in range(0, len(mp[1])):
+        print("\"0x" + mp[1][i].hex() + "\"", end="")
+        if i < len(mp[1])-1:
+            print(",", end="")
+
+    print("]," + str(index))
+            
 if __name__ == "__main__":
-    proof_count = 1
+    #Create Proofs and test Merkel Proofs
+    proof_count = 4
     private_commitments, proofs = GenerateOneBitRangeProofs(asset_address=0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359, count=proof_count)
     
     proof_hash = MerkelizeRangeProofs(proofs)
     print("proof_hash:\t" + proof_hash)
 
     for i in range(0, proof_count):
-        merkel_proof = GetMerkelProof(proofs, 0)
+        merkel_proof = GetMerkelProof(proofs, i)
         test_hash = CheckMerkelProof(merkel_proof)
         print("test_hash[" + str(i) + "]:\t" + test_hash)
+
 
 

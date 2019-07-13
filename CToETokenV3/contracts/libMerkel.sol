@@ -34,7 +34,7 @@ library Merkel {
         require(length <= a.length);
         require((start+length) <= a.length);
         
-        if (length == 1) return keccak256(abi.encodePacked(a[start]));
+        if (length == 1) return a[start];
         if (length == 2) return keccak256(abi.encodePacked(a[start], a[start+1]));
         if (length == 3) return keccak256(abi.encodePacked(a[start], a[start+1], a[start+2]));
         

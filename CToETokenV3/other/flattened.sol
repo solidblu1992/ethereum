@@ -1,4 +1,4 @@
-pragma solidity ^0.5.9;
+pragma solidity ^0.5.10;
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
@@ -264,17 +264,15 @@ library Merkel {
 
 library Commitments {	
 	struct Data {
-	    address asset_address;
 		uint x;
 		uint y;
 	}
 	
 	//High Level Functions
 	function GetCommitmentCount(bytes memory b) internal pure returns (uint count) {
-	    //b must be 20+64*N bytes long
-		require(b.length >= 84);
-		
-		count = b.length - 20;
+	    //b must be 64*N bytes long
+	    count = b.length;
+		require(count >= 64);
 		require(count % 64 == 0);
 		count = count / 64;
 	}
@@ -288,15 +286,8 @@ library Commitments {
 		uint buffer;
 		uint offset = 32; //1st byte is length, unneeded
 		
-		//Get asset address (first 20 bytes)
-		assembly { buffer := mload(add(b, offset)) }
-		address asset_address = address(buffer >> 96);
-		offset += 20;
-		
 		//Extract Commitments
 		for (uint i = 0; i < commitments.length; i++) {
-		    commitments[i].asset_address = asset_address;
-		    
 		    assembly { buffer := mload(add(b, offset)) }
         	commitments[i].x = buffer;
         	offset += 32;
@@ -622,10 +613,7 @@ contract RangeProofRegistry {
     }
     
     //Merkelize commitment set from bytes and check to see if it has been proven positive
-    function IsCommitmentSetPositive(bytes memory b) public view returns (bool) {
-        Commitments.Data[] memory commitments = Commitments.FromBytes(b);
-        bytes32 merkel_root = Commitments.Merkelize(commitments);
-        
+    function IsCommitmentSetPositive(bytes32 merkel_root) public view returns (bool) {
 		if (pure_commitment_merkels[merkel_root]) return true;
 		if (composite_commitment_merkels[merkel_root]) return true;
 		
@@ -668,11 +656,12 @@ contract RangeProofRegistry {
 	
 	//Return status of range proof
 	function GetRangeProofInfo(bytes32 proof_hash)
-		public view returns (address submitter, uint amount, uint expiration_block)
+		public view returns (address submitter, uint amount, uint expiration_block, bytes32 commitment_merkel_root)
 	{
 		submitter = pending_range_proofs[proof_hash].submitter;
 		amount = pending_range_proofs[proof_hash].amount;
 		expiration_block = pending_range_proofs[proof_hash].expiration_block;
+		commitment_merkel_root = pending_range_proofs[proof_hash].commitment_merkel_root;
 	}
     
     //Finalize Pending Range Proof
@@ -710,7 +699,7 @@ contract RangeProofRegistry {
         
         //Check that proof exists
         RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
-        require(bounty.expiration_block > 0);
+        require(!IsBlankBounty(bounty));
         
         //Check Challenge
         uint Hx;

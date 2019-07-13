@@ -230,8 +230,8 @@ def PrintMerkelProof(range_proof, index):
 def ExtractCommitmentsFromProof(proof_bytes):
     proof_size, proof_count = GetProofSizeAndCount(proof_bytes)
 
-    #Store asset address
-    out = proof_bytes[0:20]
+    #Do not store asset address
+    out = bytes()
 
     #Fetch commitments
     for i in range(0, proof_count):
@@ -305,7 +305,7 @@ def MerkelizeCommitments(c_bytes):
 
 if __name__ == "__main__":
     #Create Proofs and test Merkel Proofs
-    proof_count = 32
+    proof_count = 2
     private_commitments, proofs = GenerateOneBitRangeProofs(asset_address=0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359, count=proof_count)
     
     proof_hash = MerkelizeRangeProofs(proofs)

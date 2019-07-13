@@ -92,10 +92,7 @@ contract RangeProofRegistry {
     }
     
     //Merkelize commitment set from bytes and check to see if it has been proven positive
-    function IsCommitmentSetPositive(bytes memory b) public view returns (bool) {
-        Commitments.Data[] memory commitments = Commitments.FromBytes(b);
-        bytes32 merkel_root = Commitments.Merkelize(commitments);
-        
+    function IsCommitmentSetPositive(bytes32 merkel_root) public view returns (bool) {
 		if (pure_commitment_merkels[merkel_root]) return true;
 		if (composite_commitment_merkels[merkel_root]) return true;
 		
@@ -138,11 +135,12 @@ contract RangeProofRegistry {
 	
 	//Return status of range proof
 	function GetRangeProofInfo(bytes32 proof_hash)
-		public view returns (address submitter, uint amount, uint expiration_block)
+		public view returns (address submitter, uint amount, uint expiration_block, bytes32 commitment_merkel_root)
 	{
 		submitter = pending_range_proofs[proof_hash].submitter;
 		amount = pending_range_proofs[proof_hash].amount;
 		expiration_block = pending_range_proofs[proof_hash].expiration_block;
+		commitment_merkel_root = pending_range_proofs[proof_hash].commitment_merkel_root;
 	}
     
     //Finalize Pending Range Proof
@@ -180,7 +178,7 @@ contract RangeProofRegistry {
         
         //Check that proof exists
         RangeProofBounty memory bounty = pending_range_proofs[proof_hash];
-        require(bounty.expiration_block > 0);
+        require(!IsBlankBounty(bounty));
         
         //Check Challenge
         uint Hx;

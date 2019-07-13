@@ -4,17 +4,15 @@ import "./libMerkel.sol";
 
 library Commitments {	
 	struct Data {
-	    address asset_address;
 		uint x;
 		uint y;
 	}
 	
 	//High Level Functions
 	function GetCommitmentCount(bytes memory b) internal pure returns (uint count) {
-	    //b must be 20+64*N bytes long
-		require(b.length >= 84);
-		
-		count = b.length - 20;
+	    //b must be 64*N bytes long
+	    count = b.length;
+		require(count >= 64);
 		require(count % 64 == 0);
 		count = count / 64;
 	}
@@ -28,15 +26,8 @@ library Commitments {
 		uint buffer;
 		uint offset = 32; //1st byte is length, unneeded
 		
-		//Get asset address (first 20 bytes)
-		assembly { buffer := mload(add(b, offset)) }
-		address asset_address = address(buffer >> 96);
-		offset += 20;
-		
 		//Extract Commitments
 		for (uint i = 0; i < commitments.length; i++) {
-		    commitments[i].asset_address = asset_address;
-		    
 		    assembly { buffer := mload(add(b, offset)) }
         	commitments[i].x = buffer;
         	offset += 32;

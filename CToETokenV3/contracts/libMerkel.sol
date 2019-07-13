@@ -4,7 +4,7 @@ library Merkel {
 	//Checks merkel proof.
 	//Note: Only works for merkel trees with size 2**n
 	function GetExpectedRoot2N(bytes32 x, bytes32[] memory merkel_hashes, uint x_index)
-		public pure returns (bytes32 root)
+		internal pure returns (bytes32 root)
 	{		
 		//Hash proof pieces
 		uint k = x_index;

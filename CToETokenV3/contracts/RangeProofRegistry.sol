@@ -1,6 +1,7 @@
 pragma solidity ^0.5.9;
 
 import "./libOneBitRangeProof.sol";
+import "./libCommitments.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 contract RangeProofRegistry {
@@ -33,13 +34,14 @@ contract RangeProofRegistry {
         address submitter;
         uint amount;
         uint expiration_block;
-        uint[] commitments;
+        bytes32 commitment_merkel_root;
     }
     
     event RangeProofsSubmitted (
         bytes32 indexed proof_hash,
         uint indexed bounty_amount,
         uint indexed expiration_block,
+        bytes32 commitment_merkel_root,
         bytes proof_data
     );
     
@@ -51,51 +53,53 @@ contract RangeProofRegistry {
         bytes32 indexed proof_hash
     );
     
-    event CommitmentPositive (
-        uint indexed point_compressed
+    event CommitmentVerified (
+        bytes32 indexed merkel_root
     );
     
 	//Pending Range Proofs, may finalize into 1-bit commitments
     mapping (bytes32 => RangeProofBounty) pending_range_proofs;
 	
-	//Positive Commitments
+	//Positive Commitments, stored as merkel root of batch of commitments
 	//Pure single-asset one-bit commitments
-    mapping (uint => bool) one_bit_commitments;
+    mapping (bytes32 => bool) pure_commitment_merkels;
+    
 	//Combination of one-bit commitments of multiple assets
-	mapping (uint => bool) composite_commitments;
-	//Built from double and add combinations of one-bit commitments
-	mapping (uint => bool) large_commitments;
+	mapping (bytes32 => bool) composite_commitment_merkels;
 	
     //Data structure Helper Functions
     function GetBlankBounty() internal pure returns (RangeProofBounty memory bounty) {
-        return RangeProofBounty(address(0), 0, 0, new uint[](0));
+        return RangeProofBounty(address(0), 0, 0, bytes32(0));
     }
     
     function IsBlankBounty(RangeProofBounty memory bounty) internal pure returns (bool) {
         if (bounty.submitter != address(0)) return false;
         if (bounty.amount != 0) return false;
         if (bounty.expiration_block != 0) return false;
-        if (bounty.commitments.length > 0) return false;
+        if (bounty.commitment_merkel_root != 0) return false;
         
         return true;
     }
     
     //Verifies that all commitments have been proven positive
-    function IsPositive(uint commitment) public view returns (bool) {
-		if (one_bit_commitments[commitment]) return true;
-		if (composite_commitments[commitment]) return true;
-		if (large_commitments[commitment]) return true;
+    function IsCommitmentPositive(uint Cx, uint Cy, bytes32[] memory merkel_hashes, uint index) public view returns (bool) {
+        bytes32 merkel_root = Merkel.GetExpectedRoot2N(keccak256(abi.encodePacked(Cx, Cy)), merkel_hashes, index);
+        
+		if (pure_commitment_merkels[merkel_root]) return true;
+		if (composite_commitment_merkels[merkel_root]) return true;
 		
 		return false;
     }
     
-    function AreAllPositive(uint[] memory commitments) public view returns (bool) {
-        for (uint i = 0; i < commitments.length; i++) {
-			if (!IsPositive(commitments[i])) {
-				return false;
-			}
-        }
-        return true;
+    //Merkelize commitment set from bytes and check to see if it has been proven positive
+    function IsCommitmentSetPositive(bytes memory b) public view returns (bool) {
+        Commitments.Data[] memory commitments = Commitments.FromBytes(b);
+        bytes32 merkel_root = Commitments.Merkelize(commitments);
+        
+		if (pure_commitment_merkels[merkel_root]) return true;
+		if (composite_commitment_merkels[merkel_root]) return true;
+		
+		return false;
     }
     
     //Submit range proof along with bounty for verification
@@ -119,15 +123,17 @@ contract RangeProofRegistry {
         //Transfer DAI bounty
         dai.transferFrom(msg.sender, address(this), bounty_amount);
         
-        //Fetch Commitments
-        uint[] memory commitments = new uint[](proofs.length);
+        //Calculate commitments merkel root
+        Commitments.Data[] memory commitments = new Commitments.Data[](proofs.length);
         for (uint i = 0; i < proofs.length; i++) {
-            commitments[i] = AltBN128.CompressPoint(proofs[i].Cx, proofs[i].Cy);
+            commitments[i].x = proofs[i].Cx;
+            commitments[i].y = proofs[i].Cy;
         }
+        bytes32 commitment_merkel_root = Commitments.Merkelize(commitments);
         
         //Publish Range Proof Bounty
-        pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block, commitments);
-        emit RangeProofsSubmitted(proof_hash, bounty_amount, expiration_block, b);
+        pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block, commitment_merkel_root);
+        emit RangeProofsSubmitted(proof_hash, bounty_amount, expiration_block, commitment_merkel_root, b);
     }
 	
 	//Return status of range proof
@@ -146,17 +152,15 @@ contract RangeProofRegistry {
         require(!IsBlankBounty(bounty));
         
         //Check that expiration block has passed
-        require(block.number > bounty.expiration_block);
+        require(block.number >= bounty.expiration_block);
         emit RangeProofsAccepted(proof_hash);
         
         //Clear Bounty
         pending_range_proofs[proof_hash] = GetBlankBounty();
         
         //Publish finalized commitments to mapping
-        for (uint i = 0; i < bounty.commitments.length; i++) {
-            one_bit_commitments[bounty.commitments[i]] = true;
-            emit CommitmentPositive(bounty.commitments[i]);
-        }
+        pure_commitment_merkels[bounty.commitment_merkel_root] = true;
+        emit CommitmentVerified(bounty.commitment_merkel_root);
         
         //Return Bounty to submitter
         IERC20 dai = IERC20(DAI_ADDRESS);
@@ -195,71 +199,83 @@ contract RangeProofRegistry {
     
     //Force Prove Range Proof
     //Do not play bounty game. Verify all range proofs. High overall gas usage!
-    function ForceProve(bytes memory b, uint index) public returns (bool) {
+    function ForceProve(bytes memory b) public returns (bool) {
         //Get first proof
-        OneBitRangeProof.Data memory proof = OneBitRangeProof.FromBytes(b, index);
+        OneBitRangeProof.Data[] memory proofs = OneBitRangeProof.FromBytesAll(b);
+        require(proofs.length > 0);
         
-        //Check proof
+        //Check proofs
         uint Hx;
         uint Hy_neg;
-        (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proof.asset_address);
+        (Hx, Hy_neg) = OneBitRangeProof.CalcNegAssetH(proofs[0].asset_address);
         
-        if (OneBitRangeProof.Verify(proof, Hx, Hy_neg)) {
-            uint commitment = AltBN128.CompressPoint(proof.Cx, proof.Cy);
-            one_bit_commitments[commitment] = true;
-            emit CommitmentPositive(commitment);
-            return true;
+        Commitments.Data[] memory commitments = new Commitments.Data[](proofs.length);
+        
+        for (uint i = 0; i < proofs.length; i++) {
+            if (!OneBitRangeProof.Verify(proofs[i], Hx, Hy_neg)) return false;
+            
+            commitments[i].x = proofs[i].Cx;
+            commitments[i].y = proofs[i].Cy;
         }
-        else {
-            return false;
-        }
+        
+        //Merkelize commitments and mark as positive
+        bytes32 merkel_root = Commitments.Merkelize(commitments);
+        pure_commitment_merkels[merkel_root] = true;
+        emit CommitmentVerified(merkel_root);
+        
+        return true;
     }
 
-	//Mix one-bit commitments
-	function MixOneBitCommitments(uint Ax, uint Ay, uint Bx, uint By) public returns (uint Cx, uint Cy) {
-		//Each commitment must be pure one-bit
-		if (!one_bit_commitments[AltBN128.CompressPoint(Ax, Ay)]) return (0, 0);
-		if (!one_bit_commitments[AltBN128.CompressPoint(Bx, By)]) return (0, 0);
-		
-		//Calculate new commitment
-		(Cx, Cy) = AltBN128.AddPoints(Ax, Ay, Bx, By);
-		if (AltBN128.IsZero(Cx, Cy)) return (0, 0);
-		
-		//Compress Commitment and Mark as Positive
-		composite_commitments[AltBN128.CompressPoint(Cx, Cy)] = true;
+	//Mix one-bit commitments of two previously verified commitment sets
+	//Each set must be pure, that is of a single asset
+	function MixOneBitCommitments(bytes memory b_A, bytes memory b_B) public returns (bytes32 mixed_merkel_root) {
+	    //Unpack commitments
+	    Commitments.Data[] memory commitments_a = Commitments.FromBytes(b_A);
+	    Commitments.Data[] memory commitments_b = Commitments.FromBytes(b_B);
+	    
+	    //Check that both sets are positive
+	    require(pure_commitment_merkels[Commitments.Merkelize(commitments_a)]);
+	    require(pure_commitment_merkels[Commitments.Merkelize(commitments_b)]);
+	    
+	    //Mix commitments
+	    Commitments.Data[] memory commitments_mixed = new Commitments.Data[](commitments_a.length*commitments_b.length);
+	    uint index = 0;
+	    for (uint i = 0; i < commitments_a.length; i++) {
+	        for (uint j = 0; j < commitments_b.length; j++) {
+	            (commitments_mixed[index].x, commitments_mixed[index].y) =
+	                AltBN128.AddPoints( commitments_a[i].x, commitments_a[i].y,
+	                                    commitments_b[j].x, commitments_b[j].y  );
+	            index++;
+	        }
+	    }
+	    
+        //Merkelize commitments and mark as positive
+        mixed_merkel_root = Commitments.Merkelize(commitments_mixed);
+        composite_commitment_merkels[mixed_merkel_root] = true;
+        emit CommitmentVerified(mixed_merkel_root);
 	}
 
 	//Build large commitments
-	function BuildCommitment(uint[] memory Px, uint[] memory Py) public view returns (uint Cx, uint Cy) {
+	function BuildCommitment(bytes memory b, uint8[] memory indices) public view returns (uint Cx, uint Cy) {
+		//Unpack commitments
+	    Commitments.Data[] memory commitments = Commitments.FromBytes(b);
+		
 		//Only allow 64-bit commitments or less
-		if (Px.length > 64) return (0, 0);
-		if (Py.length != Px.length) return (0, 0);
+		if (indices.length == 0) return (0, 0);
+		if (indices.length > 64) return (0, 0);
 		
 		//Use Double and Add
-		for (uint i = 0; i < Px.length; i++) {
+		uint index;
+		for (uint i = 0; i < indices.length; i++) {
 			//Double
 			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, Cx, Cy);
 			
-			//Verify that input commitment is proven positive
-			uint compressed = AltBN128.CompressPoint(Px[i], Py[i]);
-			if (!one_bit_commitments[compressed]) {
-				if (!composite_commitments[compressed]) {
-					return (0, 0);
-				}
-			}
-			
+		    //Retreive next index, must be within array bounds
+		    index = indices[i];
+		    if (index >= commitments.length) return (0, 0);
+		    
 			//Add
-			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, Px[i], Py[i]);
+			(Cx, Cy) = AltBN128.AddPoints(Cx, Cy, commitments[index].x, commitments[index].y);
 		}
-	}
-	
-	function StoreLargeCommitment(uint[] memory Px, uint[] memory Py) public {
-		//Build Commitment
-		uint Cx;
-		uint Cy;
-		(Cx, Cy) = BuildCommitment(Px, Py);
-		
-		//Compress Commitment and Mark as Positive
-		large_commitments[AltBN128.CompressPoint(Cx, Cy)] = true;
 	}
 }

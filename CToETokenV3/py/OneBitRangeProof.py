@@ -8,7 +8,10 @@ def IsPowerOf2(i):
     return math.floor(test) == math.ceil(test)
 
 def H_from_address(address):
-    x = bn128.FQ(int.from_bytes(keccak_256(address.to_bytes(20,'big')).digest(), 'big'))
+    if type(address) == bytes:
+        x = bn128.FQ(int.from_bytes(keccak_256(address).digest(), 'big'))
+    else:
+        x = bn128.FQ(int.from_bytes(keccak_256(address.to_bytes(20,'big')).digest(), 'big'))
 
     on_curve = False
     while not on_curve:
@@ -75,7 +78,7 @@ def GenerateOneBitRangeProofs(count=16, asset_address=0x000000000000000000000000
             B = bn128.multiply(G1, s0)
             A = bn128.add(A, B)
             c1 = int.from_bytes(keccak_256(A[0].n.to_bytes(32, 'big') + A[1].n.to_bytes(32, 'big')).digest(), 'big')
-
+            
             #Complete Ring
             s1 = (alpha - c1*x[1]) % bn128.curve_order
             
@@ -87,7 +90,7 @@ def GenerateOneBitRangeProofs(count=16, asset_address=0x000000000000000000000000
             #Being Ring
             A = bn128.multiply(G1, alpha)
             c1 = int.from_bytes(keccak_256(A[0].n.to_bytes(32, 'big') + A[1].n.to_bytes(32, 'big')).digest(), 'big')
-
+            
             #Segment 1
             Cp = bn128.add(C, (H[0], -H[1])) 
             A = bn128.multiply(Cp, c1)
@@ -119,6 +122,41 @@ def GenerateOneBitRangeProofs(count=16, asset_address=0x000000000000000000000000
         print("0x" + proofs.hex())
 
     return private_commitments, proofs
+
+
+def VerifyRangeProofs(proof_bytes, pct_check=100):
+    sr = SystemRandom()
+    proof_size, proof_count = GetProofSizeAndCount(proof_bytes)
+
+    #Get asset address and H_neg
+    asset_address = int.from_bytes(proof_bytes[0:20], 'big')
+    G1 = bn128.G1
+    H_neg = H_from_address(asset_address)
+    H_neg = (H_neg[0], -H_neg[1])
+
+    for i in range(0, proof_count):
+        if pct_check == 100 or sr.randint(0, 100) < pct_check:
+            #Extract Proof
+            start = 20+i*proof_size
+            C = (bn128.FQ(int.from_bytes(proof_bytes[start:start+32], 'big')),
+                 bn128.FQ(int.from_bytes(proof_bytes[start+32:start+64], 'big')))
+            
+            c0 = int.from_bytes(proof_bytes[start+64:start+96], 'big')
+            s0 = int.from_bytes(proof_bytes[start+96:start+128], 'big')
+            s1 = int.from_bytes(proof_bytes[start+128:start+160], 'big')
+
+            #Segment 1
+            A = bn128.add(bn128.multiply(C, c0), bn128.multiply(G1, s0))
+            c1 = int.from_bytes(keccak_256(A[0].n.to_bytes(32, 'big') + A[1].n.to_bytes(32, 'big')).digest(), 'big')
+            
+            #Segment 2
+            A = bn128.add(bn128.multiply(bn128.add(C, H_neg), c1), bn128.multiply(G1, s1))
+            c0p = int.from_bytes(keccak_256(A[0].n.to_bytes(32, 'big') + A[1].n.to_bytes(32, 'big')).digest(), 'big')
+
+            if (c0 != c0p):
+                return i
+
+    return -1
 
 def ExtractProof(proof_bytes, i):
     proof_size, proof_count = GetProofSizeAndCount(proof_bytes)
@@ -307,14 +345,6 @@ if __name__ == "__main__":
     #Create Proofs and test Merkel Proofs
     proof_count = 2
     private_commitments, proofs = GenerateOneBitRangeProofs(asset_address=0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359, count=proof_count)
-    
-    proof_hash = MerkelizeRangeProofs(proofs)
-    print("proof_hash:\t" + proof_hash)
-
-    for i in range(0, proof_count):
-        merkel_proof = GetMerkelProof(proofs, i)
-        test_hash = CheckMerkelProof(merkel_proof)
-        print("test_hash[" + str(i) + "]:\t" + test_hash)
 
 
 

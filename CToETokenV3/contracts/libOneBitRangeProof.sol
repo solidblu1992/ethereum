@@ -110,6 +110,9 @@ library OneBitRangeProof {
     function Verify(Data memory proof, uint Hx, uint Hy_neg) internal view returns (bool) {
         //Allocate memory
         uint[] memory data = new uint[](7);
+        
+        //Check to see if point is on the curve
+        if (!AltBN128.IsOnCurve(proof.Cx, proof.Cy)) return false;
 
         //Do first ring segment
         //2 multiplications, 1 addition, and 1 keccak256

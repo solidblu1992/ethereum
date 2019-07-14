@@ -1,6 +1,6 @@
 {
 	"goerli_tst_address":"0xfBdB3f7db18cb66327279DD3Ab86154aa66Ab95C",
-	"goerli_reg_address":"0x5eb9c1630c40b873917ac726dde48c06a0012516",
+	"goerli_reg_address":"0x0820C0e4F7a3B4c066722Ad5f22cb6B053D38Abf",
 	"good_proof_2_commits":{
 		"proof_hash":"0xafe3ad0885cc27bd0a7cb6eeb56493f1afc2dd37138b7c9fdfacda484e1e2438",
 		"commitments_merkel":"0xdfc5d5e8c2a38254fb42af21cde62fd930eb4cb623294eb7050d8088b59ca56d",

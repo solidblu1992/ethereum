@@ -38,10 +38,11 @@ contract RangeProofRegistry {
     }
     
     event RangeProofsSubmitted (
+        address indexed submitter,
         bytes32 indexed proof_hash,
-        uint indexed bounty_amount,
-        uint indexed expiration_block,
-        bytes32 commitment_merkel_root,
+        bytes32 indexed commitment_merkel_root,
+        uint bounty_amount,
+        uint expiration_block,
         bytes proof_data
     );
     
@@ -130,7 +131,8 @@ contract RangeProofRegistry {
         
         //Publish Range Proof Bounty
         pending_range_proofs[proof_hash] = RangeProofBounty(msg.sender, bounty_amount, expiration_block, commitment_merkel_root);
-        emit RangeProofsSubmitted(proof_hash, bounty_amount, expiration_block, commitment_merkel_root, b);
+        
+        emit RangeProofsSubmitted(msg.sender, proof_hash, commitment_merkel_root, bounty_amount, expiration_block, b);
     }
 	
 	//Return status of range proof

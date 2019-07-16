@@ -1,11 +1,20 @@
-//Submission
-64 bits = 4,637,051 gas (75,000 per bit)
-https://goerli.etherscan.io/tx/0x589fd621405611598bc328995e7d0af4a3fc892c935de55f9d87dc6c2dcab65f
+//Submission (don't log proof in event / log proof in event)
+32 bits = 619,555 gas / 673,787 gas
+https://goerli.etherscan.io/tx/0x9676637203d6852e73dd835cd08ec996f8ee6fad1e8060b75210a9a6da020eae
+
+64 bits = 1,129,209 gas / 1,223,118 gas
+https://goerli.etherscan.io/tx/0x047c552bc331056ef1b7c3514743c0ab10af698bba899d65a7b07d2e6ad727c3
 
 //Challenge
-64 bits = 712,521 gas (11,133
-https://goerli.etherscan.io/tx/0xa034d92344b8710e1cbcbf5ed538b58a2a7a44c3f6fb95d28ab97abb3ec09e43
+32 bits = 195,636 gas
+https://goerli.etherscan.io/tx/0xef8530921ff7c7ea0f2554af3d7bfb95824db314135c2584d150d3087d8a5f2b
+
+64 bits = 213,191 gas
+https://goerli.etherscan.io/tx/0xb0f4a5e1561ce6ebce9b4ba9cfa9dadb95fba606042ffd30b7d57cb73744aa84
 
 //Finalization
-64 bits = 1,110,076 gas (17,500 per bit)
-https://goerli.etherscan.io/tx/0xed6d22133ee1bb68703b1ad8c4c268cd53057020b1ca4daeaa8758df100470b3
+N bits = 41,549 gas
+https://goerli.etherscan.io/tx/0xdcba69ddf0db9c2e9c6a767fad510eb93d98aaf45c1ee185b4aff7b85b586f48
+
+//Total proof cost:
+(42,000 + 21,000*N) gas

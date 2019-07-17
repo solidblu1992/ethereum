@@ -112,8 +112,14 @@ while(True):
         if accepted_proofs.get(proof_hash) == True:
             print ("Already Accepted")
 
+            #Remove from DB
+            db.table('pending_proofs').remove(Query().proof_hash == proof_hash)
+
         elif rejected_proofs.get(proof_hash) == True:
             print ("Already Rejected")
+
+            #Remove from DB
+            db.table('pending_proofs').remove(Query().proof_hash == proof_hash)
 
         elif len(query) > 0:
             #We've seen this proof before, do nothing

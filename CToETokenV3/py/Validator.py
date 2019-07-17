@@ -2,7 +2,8 @@ from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 from getpass import getpass
 import json
-from tinydb import TinyDB, Query
+from tinydb import TinyDB, Query, where
+from tinydb.operations import delete
 from OneBitRangeProof import VerifyRangeProofs, GetMerkelProof, ExtractProof
 
 CT_Validator_Options = {
@@ -76,6 +77,19 @@ def get_proof_from_event(event):
         proof_size = int.from_bytes(input_data[36:68], 'big')
         return input_data[68:68+proof_size]
 
+#Clean DB
+results = db.table('pending_proofs').search(Query().proof_hash != '')
+print()
+print("Cleaning DB")
+for result in results:
+    proof_hash = result['proof_hash']
+    return_data = registry_contract.functions.GetRangeProofInfo(bytes.fromhex(proof_hash)).call()
+    if return_data[0] == "0x0000000000000000000000000000000000000000":
+        #Drop from db
+        print("Dropping proof with hash: " + proof_hash)
+        db.table('pending_proofs').remove(Query().proof_hash == proof_hash)
+
+
 while(True):
     for event in rpa_events:
         accepted_proofs[event['args']['proof_hash']] = True
@@ -102,18 +116,19 @@ while(True):
             print ("Already Rejected")
 
         elif len(query) > 0:
+            #We've seen this proof before, do nothing
+            print ("Already Checked")
+            
             #Are we finalizing proofs that are not ours?
-            if CT_Validator_Options['finalize_all_proofs'] or rps_events[i]['args']['submitter'] == account:
-                if rps_events[i]['args']['expiration_block'] <= w3.eth.blockNumber:
-                    print("Finalizing proof...", end="")
-                    registry_contract.functions.FinalizeRangeProofs(rps_events[i]['args']['proof_hash']).transact({'from': account})
-                    print("DONE!")
-                else:
-                    #We've seen this proof before, do nothing
-                    print ("Already Checked")
-            else:
-                #We've seen this proof before, do nothing
-                print ("Already Checked")
+            if query[0]['valid']:
+                if CT_Validator_Options['finalize_all_proofs'] or rps_events[i]['args']['submitter'] == account:
+                    if rps_events[i]['args']['expiration_block'] <= w3.eth.blockNumber:
+                        print("Finalizing proof...", end="")
+                        registry_contract.functions.FinalizeRangeProofs(rps_events[i]['args']['proof_hash']).transact({'from': account})
+                        print("DONE!")
+
+                        #Remove from db
+                        db.table('pending_proofs').update(delete('proof_hash'), where('proof_hash') == proof_hash.hex())
 
         #Verify proof
         else:

@@ -123,7 +123,7 @@ while(True):
 
         elif len(query) > 0:
             #We've seen this proof before, do nothing
-            print ("Already Checked")
+            print ("Pending, Already Checked")
             
             #Are we finalizing proofs that are not ours?
             if query[0]['valid']:
@@ -147,7 +147,10 @@ while(True):
             index = VerifyRangeProofs(proof, CT_Validator_Options['pct_proof_check'])
             if (index == -1):
                 #Proof is probably good
-                print("PASSED")
+                if CT_Validator_Options['pct_proof_check'] == 100:
+                    print("PASSED")
+                else:
+                    print("PROBABLY PASSED")
 
                 #Are we finalizing proofs that are not ours?
                 if CT_Validator_Options['finalize_all_proofs'] or rps_events[i]['args']['submitter'] == account:

@@ -50,6 +50,9 @@ def BuildCommitmentPrivate(v, private_bit_commitments, target_bits=64):
         total_bf = total_bf + private_bit_commitments[indices[i]][1] % bn128.curve_order 
         bit_flag >>= 1
 
+    #Create Proof
+    
+
     return indices, total_bf
 
 #Assemble
@@ -98,3 +101,10 @@ if __name__ == "__main__":
     #Do results match?
     print("Do they match?")
     print(bn128.eq(C_out, C_expected))
+    print()
+
+    #Output proof
+    print("Output proof:")
+    print(bytes(indices).hex())
+    print()
+    print(data[0]['data'])

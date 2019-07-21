@@ -142,7 +142,7 @@ while(True):
             
             #Get proof size, for fun
             proof_size = (len(proof)-20) // 160
-            print(str(proof_size) + " bits, ", end="")
+            print("Checking proof of " + str(proof_size) + " bits, ", end="", flush=True)
             
             index = VerifyRangeProofs(proof, CT_Validator_Options['pct_proof_check'])
             if (index == -1):

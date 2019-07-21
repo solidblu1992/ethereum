@@ -5,6 +5,18 @@ import json
 from tinydb import TinyDB, Query, where
 from tinydb.operations import delete
 from OneBitRangeProof import GenerateOneBitRangeProofs, MerkelizeRangeProofs, ExtractCommitmentsFromProof, MerkelizeCommitments
+from time import time, sleep
+
+def tx_wait_timeout(w3, tx_hash, timeout=30, poll_interval=1):
+    start_time = time()
+
+    tx = w3.eth.getTransaction(tx_hash)
+    while(tx['blockNumber']==None):
+        assert(time()-start_time < timeout)
+        
+        sleep(poll_interval)
+        tx = w3.eth.getTransaction(tx_hash)
+        print('.', end="", flush=True)
 
 CT_Client_Options = {}
     
@@ -56,12 +68,14 @@ if len(query) == 0:
     #Add more coins if necessary
     if allowance < 32*10**18:
         print("Not enough ERC20 coins in allowance, allowing more...", end="")
-        erc20_contract.functions.approve(registry_contract.address, 100*10**18).transact({'from': account})
+        tx = erc20_contract.functions.approve(registry_contract.address, 100*10**18).transact({'from': account})
+        tx_wait_timeout(w3, tx)
         print("DONE!")
 
     #Submit proof
     print("Submitting proof...", end="")
-    registry_contract.functions.SubmitRangeProofs(proofs).transact({'from': account})
+    tx = registry_contract.functions.SubmitRangeProofs(proofs).transact({'from': account})
+    tx_wait_timeout(w3, tx)
     print("DONE!")
     
     #Add proof and commitments to db

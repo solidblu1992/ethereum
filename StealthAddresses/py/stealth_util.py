@@ -99,11 +99,21 @@ def GetSharedSecret(R, scan_key):
 
     if type(scan_key) == bytes:
         scan_key = int.from_bytes(scan_key, 'big')
-        
-    SS = curve.multiply(R, scan_key)
 
     hasher = sha256()
-    hasher.update(int.to_bytes(SS[0], 32, 'big') + int.to_bytes(SS[1], 32, 'big'))
+
+    #XETH has certain oddities to how it calculates the shared secret
+    using_XETH = True
+    if using_XETH:
+        #ss = sha256(compress(scan_key*G + R))
+        SS = CompressPoint(curve.add(R, curve.multiply(curve.G, scan_key)))
+        hasher.update(SS)
+        
+    else:
+        #ss = sha256(expand(scan_key*R))
+        SS = curve.multiply(R, scan_key)
+        hasher.update(int.to_bytes(SS[0], 32, 'big') + int.to_bytes(SS[1], 32, 'big'))
+
     ss = hasher.digest()
 
     return ss

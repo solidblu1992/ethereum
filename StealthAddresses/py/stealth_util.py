@@ -126,7 +126,10 @@ def GetAddrFromSharedSecret(ss, pub_spend_key):
 
 def GetPrivKeyFromSharedSecret(ss, priv_spend_key):
     ss = int.from_bytes(ss, 'big')
-    priv_spend_key = int.from_bytes(priv_spend_key, 'big')
+
+    if type(priv_spend_key) == bytes:
+        priv_spend_key = int.from_bytes(priv_spend_key, 'big')
+        
     return (ss + priv_spend_key) % curve.N
 
 #Stealth Write

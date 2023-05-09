@@ -1,6 +1,5 @@
 import json
 from getpass import getpass
-from py_ecc import secp256k1
 from eth_keyfile import create_keyfile_json
 from stealth_util import *
 from random import SystemRandom
@@ -27,13 +26,13 @@ def stealth_generate(filename):
     print("Generating stealth address key pair...", end="")
     rng = SystemRandom()
     
-    scan_key = (rng.getrandbits(256) % secp256k1.N).to_bytes(32, "big")
-    pub_scan_key = secp256k1.privtopub(scan_key)
+    scan_key = (rng.getrandbits(256) % N).to_bytes(32, "big")
+    pub_scan_key = GetPubKeyFromPrivKey(scan_key)
     js_scan = create_keyfile_json(scan_key, bytes(password, 'utf'))
     del scan_key
     
-    spend_key = (rng.getrandbits(256) % secp256k1.N).to_bytes(32, "big")
-    pub_spend_key = secp256k1.privtopub(spend_key)
+    spend_key = (rng.getrandbits(256) % N).to_bytes(32, "big")
+    pub_spend_key = GetPubKeyFromPrivKey(spend_key)
     js_spend = create_keyfile_json(spend_key, bytes(password, 'utf'))
     del spend_key
     del password
@@ -61,3 +60,6 @@ def stealth_generate(filename):
         file.write(js)
 
     print("Done!")
+
+if __name__ == "__main__":    
+    stealth_generate("wallet.json")

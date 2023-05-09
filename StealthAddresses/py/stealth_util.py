@@ -1,11 +1,62 @@
-from py_ecc.fields import FQ
-from py_ecc.secp256k1 import secp256k1 as curve
 from eth_keyfile import decode_keyfile_json
 import json
 from getpass import getpass
 
+use_secp256k1 = False
+use_altbn128 = True
+if use_secp256k1:
+    from py_ecc.secp256k1 import P, N, G, privtopub
+    from py_ecc.secp256k1.secp256k1 import A, B, add as curve_add, multiply as curve_multiply, from_jacobian as curve_normalize
+
+if use_altbn128:
+    from py_ecc.optimized_bn128 import field_modulus as P, curve_order as N, G1 as G, b, add as curve_add, multiply as curve_multiply, normalize as curve_normalize, FQ
+    A = 0
+    B = b.n
+
+
 #Utility Functions
 #general
+def add(P1, P2):
+    if use_altbn128:
+        if len(P1) == 3:
+            P1 = (FQ(P1[0]), FQ(P1[1]), FQ(P1[2]))
+        else:
+            P1 = (FQ(P1[0]), FQ(P1[1]))
+
+        if len(P2) == 3:
+            P2 = (FQ(P2[0]), FQ(P2[1]), FQ(P2[2]))
+        else:
+            P2 = (FQ(P2[0]), FQ(P2[1]))
+            
+    return curve_add(P1, P2)
+
+def multiply(P, k):
+    if use_altbn128:
+        if len(P) == 3:
+            P = (FQ(P[0]), FQ(P[1]), FQ(P[2]))
+        else:
+            P = (FQ(P[0]), FQ(P[1]))
+            
+    if type(k) == bytes:
+        k = int.from_bytes(k)
+        
+    return curve_multiply(P, k)
+
+def normalize(P, ret_as_FQ=True):
+    if len(P) == 3:
+        if use_altbn128:
+            P = (FQ(P[0]), FQ(P[1]), FQ(P[2]))
+        
+        P = curve_normalize(P)
+
+    if use_altbn128:
+        if ret_as_FQ:
+            P = (FQ(P[0]), FQ(P[1]), FQ.one())
+        else:
+            P = (int(P[0]), int(P[1]), 1)
+        
+    return P
+
 def bytes_from_hex_string(s, desired_byte_length=0):
     #Extract Address
     b = s[2:]
@@ -18,6 +69,11 @@ def bytes_from_hex_string(s, desired_byte_length=0):
 def CompressPoint(Pin):
     if (type(Pin) != tuple):
         return Pin
+
+    Pin = normalize(Pin)
+
+    if type(Pin[0]) != int:
+        Pin = (Pin[0].n, Pin[1].n)
 
     Pout = Pin[0]
     if ( (Pin[1] & 0x1) == 0x1):
@@ -35,33 +91,31 @@ def ExpandPoint(Pin):
     x = raw_int & (2**256 - 1)
     assert (sign == 2 or sign == 3)
     
-    y_squared = (pow(x, 3, curve.P) + (curve.A*x) + (curve.B)) % curve.P
-    y = pow(y_squared, (curve.P+1)//4, curve.P)
+    y_squared = (pow(x, 3, P) + (A*x) + (B)) % P
+    y = pow(y_squared, (P+1)//4, P)
 
-    assert (y_squared == pow(y, 2, curve.P))
+    assert (y_squared == pow(y, 2, P))
 
     if (sign == 2):
         if ( (y & 0x1) == 0 ):
             Pout = (x, y)
         else:
-            Pout = (x, curve.P-y)
+            Pout = (x, P-y)
     else:
         if ( (y & 0x1) == 0 ):
-            Pout = (x, curve.P-y)
+            Pout = (x, P-y)
         else:
             Pout = (x, y)
 
     return Pout
 
+def GetPubKeyFromPrivKey(priv_key):
+    return normalize(multiply(G, priv_key))
+
 #Stealth Read
 def GetAddrFromPubKey(pub_key):
     from eth_hash.auto import keccak
-
-    if len(pub_key) == 3:
-        pub_key = curve.from_jacobian(pub_key)
-
-    #print(f"GetAddrFromPubKey: pub_key={pub_key}")
-        
+    pub_key = normalize(pub_key, False)        
     digest = keccak(int.to_bytes(pub_key[0], 32, 'big') + int.to_bytes(pub_key[1], 32, 'big'))
     addr = digest[-20:]   
     return addr
@@ -104,18 +158,21 @@ def GetSharedSecret(R, scan_key):
     if type(scan_key) == bytes:
         scan_key = int.from_bytes(scan_key, 'big')
 
+    if not use_secp256k1 and type(R[0]) == int:
+        R = (FQ(R[0]), FQ(R[1]), FQ.one())
+
     hasher = sha256()
 
     #XETH has certain oddities to how it calculates the shared secret
     using_XETH = True
     if using_XETH:
         #ss = sha256(compress(scan_key*G + R))
-        SS = CompressPoint(curve.add(R, curve.multiply(curve.G, scan_key)))
+        SS = CompressPoint(add(R, multiply(G, scan_key)))
         hasher.update(SS)
         
     else:
         #ss = sha256(expand(scan_key*R))
-        SS = curve.multiply(R, scan_key)
+        SS = multiply(R, scan_key)
         hasher.update(int.to_bytes(SS[0], 32, 'big') + int.to_bytes(SS[1], 32, 'big'))
 
     ss = hasher.digest()
@@ -124,8 +181,11 @@ def GetSharedSecret(R, scan_key):
 
 def GetAddrFromSharedSecret(ss, pub_spend_key):
     #print(f"GetAddrFromSharedSecret: ss={ss.hex()}, pub_spend_key={pub_spend_key}")
-    P = curve.multiply(curve.G, int.from_bytes(ss, 'big'))
-    P = curve.add(P, pub_spend_key)
+    if not use_secp256k1 and type(pub_spend_key[0]) == int:
+        pub_spend_key = (FQ(pub_spend_key[0]), FQ(pub_spend_key[1]), FQ.one())
+        
+    P = multiply(G, int.from_bytes(ss, 'big'))
+    P = add(P, pub_spend_key)
     addr = GetAddrFromPubKey(P)
     return addr
 
@@ -135,14 +195,14 @@ def GetPrivKeyFromSharedSecret(ss, priv_spend_key):
     if type(priv_spend_key) == bytes:
         priv_spend_key = int.from_bytes(priv_spend_key, 'big')
         
-    return (ss + priv_spend_key) % curve.N
+    return (ss + priv_spend_key) % N
 
 #Stealth Write
 def CreateStealthTx(pub_scan_key, pub_spend_key):
     from random import SystemRandom
     rnd = SystemRandom()
     r = rnd.getrandbits(256)
-    R = CompressPoint(curve.multiply(curve.G, r))
+    R = CompressPoint(multiply(G, r))
 
     ss = GetSharedSecret(pub_scan_key, r)
     addr = GetAddrFromSharedSecret(ss, pub_spend_key)
@@ -217,22 +277,25 @@ def SchnorrMultiSign(message, priv_keys):
     if type(message) == str:
         message = bytes(message, 'utf')
     
-    r = int.from_bytes(urandom(32)) % curve.N
-    R = curve.multiply(curve.G, r)
+    r = int.from_bytes(urandom(32)) % N
+    R = normalize(multiply(G, r), False)
     x_sum = 0
     Y = []
     e = sha256(int.to_bytes(R[0], 32, 'big') + int.to_bytes(R[1], 32, 'big'))
-    e.update(message)
+    message_hash = sha256(message).digest()
+    e.update(message_hash)
     for x in priv_keys:
         x_sum = x_sum + int.from_bytes(x)
-        Y_x = curve.privtopub(x)
+        Y_x = normalize(multiply(G, x), False)
+            
         Y.append(Y_x)
         e.update(int.to_bytes(Y_x[0], 32, 'big') + int.to_bytes(Y_x[1], 32, 'big'))
-    e = int.from_bytes(e.digest()) % curve.N
+    e = int.from_bytes(e.digest()) % N
     
-    s = (r - e*x_sum) % curve.N
+    s = (r - e*x_sum) % N
     sig = {
         "message": message,
+        "message_hash": message_hash,
         "Y": Y,
         "e": e,
         "s": s
@@ -241,25 +304,26 @@ def SchnorrMultiSign(message, priv_keys):
 
 def SchnorrMultiVerify(sig: dict()):
     from hashlib import sha256
-    S = curve.multiply(curve.G, sig["s"])
+    S = multiply(G, sig["s"])
 
     Y = []
     Y_sum = None
     for Y_x in sig["Y"]:
-        Y.append(Y_x)
+        Y.append(normalize(Y_x, False))
 
         if Y_sum == None:
             Y_sum = Y_x
         else:
-            Y_sum = curve.add(Y_sum, Y_x)
+            Y_sum = add(Y_sum, Y_x)
 
-    Rv = curve.add(S, curve.multiply(Y_sum, sig["e"]))
+    Rv = normalize(add(S, multiply(Y_sum, sig["e"])), False)
     
     e = sha256(int.to_bytes(Rv[0], 32, 'big') + int.to_bytes(Rv[1], 32, 'big'))
-    e.update(sig["message"])
+    message_hash = sha256(sig["message"]).digest()
+    e.update(message_hash)
     for Y_x in Y:
         e.update(int.to_bytes(Y_x[0], 32, 'big') + int.to_bytes(Y_x[1], 32, 'big'))
-    e = int.from_bytes(e.digest()) % curve.N
+    e = int.from_bytes(e.digest()) % N
 
     if sig["e"] == e:
         print("SIGNATURE VALID")

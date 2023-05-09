@@ -1,6 +1,5 @@
 import json
 from getpass import getpass
-from py_ecc import secp256k1
 from eth_keyfile import load_keyfile, decode_keyfile_json, create_keyfile_json
 from stealth_util import *
 
@@ -12,12 +11,11 @@ def stealth_receive(directory):
     wallet = ReadStealthKeysFromFile(directory + 'wallet.json')
     scan_key = wallet['scan_key']
     spend_key = wallet['spend_key']
-    password = wallet['password']
     del wallet
 
-    pub_scan_key = secp256k1.privtopub(scan_key)
+    pub_scan_key = GetPubKeyFromPrivKey(scan_key)
     print(f"pub_scan_key={pub_scan_key}")
-    pub_spend_key = secp256k1.privtopub(spend_key)
+    pub_spend_key = GetPubKeyFromPrivKey(spend_key)
     print(f"pub_spend_key={pub_spend_key}")
     stealth_address = GetStealthAddressFromKeys(pub_scan_key, pub_spend_key)
 
@@ -29,6 +27,7 @@ def stealth_receive(directory):
     print("Input Count: " + str(len(input_json["keys"])))
 
     #New Password for keystores
+    print("Enter the password for the new keystores:")
     password = getpass()
 
     for key in input_json["keys"]:

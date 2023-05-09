@@ -12,20 +12,21 @@ contract SchnorrVerifier {
         require(AltBN128.IsOnCurve(Yx, Yy));
         
         //Perform Elliptic Curve Math
-        uint Sx;
-        uint Sy;
-        (Sx, Sy) = AltBN128.MultiplyG1(s);
-
-        uint EYx;
-        uint EYy;
-        (EYx, EYy) = AltBN128.MultiplyPoint(Yx, Yy, e);
-
         uint Rvx;
         uint Rvy;
-        (Rvx, Rvy) = AltBN128.AddPoints(Sx, Sy, EYx, EYy);
+        {
+            uint Sx;
+            uint Sy;
+            (Sx, Sy) = AltBN128.MultiplyG1(s);
+
+            uint EYx;
+            uint EYy;
+            (EYx, EYy) = AltBN128.MultiplyPoint(Yx, Yy, e);
+            (Rvx, Rvy) = AltBN128.AddPoints(Sx, Sy, EYx, EYy);
+        }
 
         //Compute Hash
-        uint ev = uint(sha256(abi.encode(Rvx, Rvy, message_hash, Yx, Yy)));
+        uint ev = uint(sha256(abi.encodePacked(Rvx, Rvy, message_hash, Yx, Yy))) % AltBN128.GetN();
 
         return (ev == e);
     }
@@ -60,11 +61,13 @@ contract SchnorrVerifier {
         }
 
         //Compute Hash
-        bytes memory pub_keys = abi.encode(Yx[0], Yy[0]);
-        for (uint i = 1; i < Yx.length; i++) {
-            pub_keys = abi.encode(pub_keys, Yx[i], Yy[1]);
+        uint[] memory pub_keys = new uint[](Yx.length + Yy.length);
+
+        for (uint i = 0; i < Yx.length; i++) {
+            pub_keys[2*i] = Yx[i];
+            pub_keys[2*i+1] = Yy[i];
         }
-        uint ev = uint(sha256(abi.encode(Rvx, Rvy, message_hash, pub_keys)));
+        uint ev = uint(sha256(abi.encodePacked(Rvx, Rvy, message_hash, pub_keys))) % AltBN128.GetN();
 
         return (ev == e);
     }

@@ -55,11 +55,15 @@ def ExpandPoint(Pin):
 
 #Stealth Read
 def GetAddrFromPubKey(pub_key):
-    from sha3 import keccak_256
-    
-    hasher = keccak_256()
-    hasher.update(int.to_bytes(pub_key[0], 32, 'big') + int.to_bytes(pub_key[1], 32, 'big'))
-    addr = hasher.digest()[-20:]   
+    from eth_hash.auto import keccak
+
+    if len(pub_key) == 3:
+        pub_key = curve.from_jacobian(pub_key)
+
+    #print(f"GetAddrFromPubKey: pub_key={pub_key}")
+        
+    digest = keccak(int.to_bytes(pub_key[0], 32, 'big') + int.to_bytes(pub_key[1], 32, 'big'))
+    addr = digest[-20:]   
     return addr
 
 def GetStealthAddressFromKeys(scan_pub_key, spend_pub_key):
@@ -119,6 +123,7 @@ def GetSharedSecret(R, scan_key):
     return ss
 
 def GetAddrFromSharedSecret(ss, pub_spend_key):
+    #print(f"GetAddrFromSharedSecret: ss={ss.hex()}, pub_spend_key={pub_spend_key}")
     P = curve.multiply(curve.G, int.from_bytes(ss, 'big'))
     P = curve.add(P, pub_spend_key)
     addr = GetAddrFromPubKey(P)
@@ -147,7 +152,7 @@ def CreateStealthTx(pub_scan_key, pub_spend_key):
     return R, addr
 
 #File Functions
-def ReadAddressFromFile(filename):
+def ReadStealthAddressFromFile(filename):
     out = dict()
     with open(filename) as f:
         #Read File
@@ -160,7 +165,7 @@ def ReadAddressFromFile(filename):
 
     return out
 
-def ReadKeysFromFile(filename, password=None):
+def ReadStealthKeysFromFile(filename, password=None):
     out = dict()
     with open(filename) as f:
         #Read File
@@ -176,7 +181,89 @@ def ReadKeysFromFile(filename, password=None):
             password = getpass()
             
         out['scan_key'] = decode_keyfile_json(file_json['scan_key'], bytes(password, 'utf'))
-        out['spend_key'] = decode_keyfile_json(file_json['scan_key'], bytes(password, 'utf'))
+        out['spend_key'] = decode_keyfile_json(file_json['spend_key'], bytes(password, 'utf'))
         del password
 
     return out
+
+def ReadKeysFromFiles(filenames, password=None):
+    out = dict()
+
+    #Read Password
+    if password==None:
+        password = getpass()
+
+    out['address'] = []
+    out['priv_key'] = []
+    
+    for filename in filenames:
+        with open(filename) as f:
+            #Read File
+            file_json = json.load(f)
+
+            #Extract Address
+            addr = bytes_from_hex_string(file_json['address'], 40)
+            out['address'].append(addr)
+            out['priv_key'].append(decode_keyfile_json(file_json, bytes(password, 'utf')))
+
+    del password
+    return out
+
+#Schnorr Utilities
+def SchnorrMultiSign(message, priv_keys):
+    from os import urandom
+    from hashlib import sha256
+
+    if type(message) == str:
+        message = bytes(message, 'utf')
+    
+    r = int.from_bytes(urandom(32)) % curve.N
+    R = curve.multiply(curve.G, r)
+    x_sum = 0
+    Y = []
+    e = sha256(int.to_bytes(R[0], 32, 'big') + int.to_bytes(R[1], 32, 'big'))
+    e.update(message)
+    for x in priv_keys:
+        x_sum = x_sum + int.from_bytes(x)
+        Y_x = curve.privtopub(x)
+        Y.append(Y_x)
+        e.update(int.to_bytes(Y_x[0], 32, 'big') + int.to_bytes(Y_x[1], 32, 'big'))
+    e = int.from_bytes(e.digest()) % curve.N
+    
+    s = (r - e*x_sum) % curve.N
+    sig = {
+        "message": message,
+        "Y": Y,
+        "e": e,
+        "s": s
+    }
+    return sig
+
+def SchnorrMultiVerify(sig: dict()):
+    from hashlib import sha256
+    S = curve.multiply(curve.G, sig["s"])
+
+    Y = []
+    Y_sum = None
+    for Y_x in sig["Y"]:
+        Y.append(Y_x)
+
+        if Y_sum == None:
+            Y_sum = Y_x
+        else:
+            Y_sum = curve.add(Y_sum, Y_x)
+
+    Rv = curve.add(S, curve.multiply(Y_sum, sig["e"]))
+    
+    e = sha256(int.to_bytes(Rv[0], 32, 'big') + int.to_bytes(Rv[1], 32, 'big'))
+    e.update(sig["message"])
+    for Y_x in Y:
+        e.update(int.to_bytes(Y_x[0], 32, 'big') + int.to_bytes(Y_x[1], 32, 'big'))
+    e = int.from_bytes(e.digest()) % curve.N
+
+    if sig["e"] == e:
+        print("SIGNATURE VALID")
+        return True
+    else:
+        print("SIGNATURE INVALID")
+        return False
